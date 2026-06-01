@@ -1,6 +1,7 @@
 ﻿// Imports generic collection types such as List<T>, Dictionary<TKey,TValue>.
 // Required because we use List<object> later in this file.
 using System.Collections.Generic;
+using SharedKernel.Domain.Abstractions;
 
 // Namespace groups related domain classes together.
 // SharedKernel = reusable across all modules.
@@ -18,7 +19,7 @@ public abstract class Entity<TId>
     // readonly = reference cannot be reassigned after construction.
     // List<object> stores domain events raised by this entity.
     // [] is C# collection expression creating an empty list.
-    private readonly List<object> _domainEvents = [];
+    private readonly List<IDomainEvent> _domainEvents = [];
 
     // public = accessible everywhere.
     // TId = generic identifier type.
@@ -43,11 +44,11 @@ public abstract class Entity<TId>
     // IReadOnlyCollection prevents external modification.
     // Expression-bodied property (=>).
     // AsReadOnly() exposes a read-only wrapper around the list.
-    public IReadOnlyCollection<object> DomainEvents => _domainEvents.AsReadOnly();
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     // protected = only derived entities can raise domain events.
     // void = no return value.
-    protected void AddDomainEvent(object domainEvent)
+    protected void AddDomainEvent(IDomainEvent domainEvent)
     {
         _domainEvents.Add(domainEvent);
     }
