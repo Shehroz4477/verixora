@@ -1,120 +1,71 @@
-﻿using System;
+﻿// ==========================================================================
+// LINE-BY-LINE C# EXPLANATION (VERIXORA SHARED KERNEL – DOMAIN EXCEPTION)
+// ==========================================================================
 
+// using System: imports fundamental types like Exception, string
+// Concept: Base Class Library (BCL) – Exception lives in System namespace
+// What we achieve: Use Exception without fully qualifying System.Exception
+using System;
+
+// namespace declaration with traditional block scope
+// Concept: Organizes types into a logical container
+// What we achieve: DomainException belongs to SharedKernel.Domain.Exceptions
+// Example: Fully qualified name is SharedKernel.Domain.Exceptions.DomainException
 namespace SharedKernel.Domain.Exceptions
 {
+    // XML documentation comment – explains purpose and design decisions
     /// <summary>
     /// ==========================================================
     /// DOMAIN EXCEPTION (VERIXORA CORE CONCEPT)
-    /// ==========================================================
-    /// 
-    /// 📌 WHAT IS THIS?
-    /// This is a BASE exception used for ALL business rule violations
-    /// inside the Domain layer of VERIXORA.
-    /// 
-    /// 📌 SIMPLE MEANING:
-    /// If something breaks a BUSINESS RULE (not technical failure),
-    /// we throw this exception.
-    /// 
-    /// Example:
-    /// - User tries login but email is not verified
-    /// - Device is locked but unlock is attempted
-    /// - Invalid state transition in aggregate
-    /// 
-    /// ==========================================================
-    /// WHY WE NEED THIS (VERY IMPORTANT)
-    /// ==========================================================
-    /// Without this:
-    /// ❌ We would use System.Exception everywhere (bad practice)
-    /// ❌ We cannot identify domain vs system errors
-    /// ❌ Debugging becomes confusing in large systems
-    /// ❌ Frontend cannot map errors properly
-    /// 
-    /// With this:
-    /// ✅ Clear business rule failure indicator
-    /// ✅ Clean separation from Infrastructure/Application errors
-    /// ✅ Easier logging and monitoring
-    /// 
-    /// ==========================================================
-    /// CLEAN ARCHITECTURE RULE
-    /// ==========================================================
-    /// Domain layer MUST NOT depend on:
-    /// - UI (frontend)
-    /// - API responses
-    /// - Database
-    /// - Localization
-    /// 
-    /// Domain ONLY expresses "WHAT is wrong", not "HOW to show it"
-    /// ==========================================================
+    /// ...
     /// </summary>
+
+    // public class DomainException : Exception – inherits from System.Exception
+    // Concept: Custom exception – extends built-in exception with domain-specific properties
+    // What we achieve: Distinguish business rule violations from technical failures
+    // Example: throw new DomainException("USER_EMAIL_NOT_VERIFIED");
     public class DomainException : Exception
     {
         /// <summary>
-        /// ==========================================================
-        /// PROPERTY: Code
-        /// ==========================================================
-        /// 📌 WHAT IS THIS?
-        /// A machine-readable identifier for the error.
-        /// 
-        /// Example:
-        /// USER_EMAIL_NOT_VERIFIED
-        /// DEVICE_LOCKED
-        /// ACCESS_DENIED
-        /// 
-        /// 📌 WHY STRING, NOT ENUM?
-        /// ✔ String allows distributed modules (micro/monolith safe)
-        /// ✔ Easier to extend without recompiling shared contracts
-        /// ✔ Works well with logging + APIs + frontend mapping
-        /// 
-        /// ALTERNATIVE:
-        /// ❌ enum DomainErrorCode
-        /// → safer at compile-time but less flexible for modular systems
-        /// ==========================================================
+        /// Property: Code – machine-readable error identifier
         /// </summary>
+        // public string Code { get; } – auto-implemented read-only property
+        // Concept: Getter-only auto-property – can be set only in constructor
+        // What we achieve: Exposes error code without allowing modification after creation
+        // Example: catch (DomainException ex) { log.LogError("Error code: {Code}", ex.Code); }
         public string Code { get; }
 
         /// <summary>
-        /// ==========================================================
-        /// CONSTRUCTOR 1
-        /// ==========================================================
-        /// 📌 PURPOSE:
-        /// Used when ONLY error code is needed.
-        /// 
-        /// 📌 WHY PASS CODE TO base(code)?
-        /// Because Exception requires a message.
-        /// We reuse "code" as internal technical message for logs.
-        /// 
-        /// NOTE:
-        /// This message is NOT for users.
-        /// It is only for debugging/logging purposes.
-        /// ==========================================================
+        /// Constructor 1 – code only
         /// </summary>
+        // public constructor with single string parameter
+        // Concept: Constructor overloading – provide different ways to create exception
+        // What we achieve: Minimal constructor when only error code is needed (no inner exception)
+        // Example: throw new DomainException("DEVICE_LOCKED");
         public DomainException(string code)
+            // : base(code) – calls base class (Exception) constructor with the code string as message
+            // Concept: Base constructor chaining – ensures base class is properly initialized
+            // What we achieve: Exception.Message gets the code (useful for debugging/logs)
             : base(code)
         {
+            // Assign the code parameter to the read-only Code property
             Code = code;
         }
 
         /// <summary>
-        /// ==========================================================
-        /// CONSTRUCTOR 2
-        /// ==========================================================
-        /// 📌 PURPOSE:
-        /// Used when wrapping another exception.
-        /// 
-        /// Example:
-        /// SQL error → becomes DomainException
-        /// NullReference → becomes DomainException
-        /// 
-        /// 📌 WHY innerException?
-        /// ✔ Preserves original technical error
-        /// ✔ Helps debugging root cause
-        /// ✔ Maintains full exception stack trace
-        /// 
-        /// ==========================================================
+        /// Constructor 2 – code with inner exception
         /// </summary>
+        // public constructor with code and innerException parameters
+        // Concept: Constructor overloading – allows wrapping another exception
+        // What we achieve: Preserve original exception (e.g., SQL error) inside domain exception
+        // Example: try { db.Save(); } catch (SqlException ex) { throw new DomainException("DB_SAVE_FAILED", ex); }
         public DomainException(string code, Exception innerException)
+            // : base(code, innerException) – passes code as message and innerException to base
+            // Concept: Inner exception chain – maintains full stack trace and root cause
+            // What we achieve: Debugging tools can drill into the original technical error
             : base(code, innerException)
         {
+            // Assign the code parameter to the read-only Code property
             Code = code;
         }
     }
