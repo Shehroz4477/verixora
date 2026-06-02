@@ -1,212 +1,177 @@
-# VERIXORA Requirements Assessment
+# FINAL VERIXORA REQUIREMENTS ASSESSMENT (CLEAN VERSION)
 
-This document analyzes the requirements gathered so far and separates enterprise-ready decisions from items that need refinement or should be deferred.
+---
 
-## Accepted Core Requirements
+# SYSTEM OVERVIEW
 
-These requirements are strong enough to guide implementation now.
+VERIXORA is an IoT-based smart security and access control platform.
 
-### Product Domain
+It provides secure management of:
 
-VERIXORA is an IoT smart security and access control platform for homes, rentals, and small businesses. The core domain is physical access control: deciding who can access which protected resource, under what conditions, and recording every important security event.
+* users
+* homes
+* devices
+* smart locks
+* access control decisions
+* audit logging
 
-### Backend Authority
+Backend is the system of record for all decisions.
 
-The backend is the only source of truth for access decisions. IoT devices are passive executors. Devices must not decide whether a door can unlock.
+---
 
-### Architecture
+# REQUIREMENT CLASSIFICATION MODEL
 
-The backend will use:
+All requirements are classified as:
 
-- ASP.NET Core 8
-- Modular monolith
-- Clean Architecture
-- Vertical Slice Architecture
-- CQRS
-- Domain events and integration events
+* MUST HAVE (core system functionality)
+* SHOULD HAVE (important but not critical)
+* NICE TO HAVE (future enhancements)
 
-The modular monolith is the correct choice for this stage. It gives enterprise structure without the operational cost of microservices.
+---
 
-### Module Boundaries
+# MUST HAVE REQUIREMENTS (MVP CORE)
 
-The 13-module catalog is accepted:
+## Identity System
 
-- Identity
-- Authorization
-- Sessions
-- Devices
-- Provisioning
-- SmartLocks
-- Monitoring
-- AuditLogs
-- Notifications
-- Reports
-- Automation
-- Security
-- FaceVerification
+* User registration
+* Login with JWT authentication
+* Session management
+* Refresh token rotation
 
-No module-to-module direct dependency is allowed. Cross-module communication should happen through contracts, domain events, integration events, or application-level orchestration.
+## Home System (Tenant Core)
 
-### Security Model
+* Create Home (tenant)
+* Assign users to Home
+* Assign roles per Home
 
-Accepted security requirements:
+## Device System
 
-- JWT access tokens
-- Refresh token rotation
-- Session tracking
-- Trusted devices
-- RBAC and permission-based authorization
-- Device-level access restrictions
-- Schedule-based restrictions
-- Email OTP
-- Optional face verification
-- Immutable audit logs
+* Register IoT devices (ESP32)
+* Assign device to Home
+* Device status tracking
 
-### Unlock Decision Pipeline
+## Smart Lock Control
 
-The 10-layer unlock pipeline is accepted as the key domain workflow:
+* Lock door
+* Unlock door (via validation pipeline)
+* Device command execution via MQTT
 
-1. JWT validation
-2. Session validation
-3. User active check
-4. Role check
-5. Permission check
-6. Door-specific access check
-7. Schedule restriction check
-8. Trusted device check
-9. Door health check
-10. Face verification when required
+## Authorization System
 
-The ordering is good because cheap checks run before expensive checks.
+* Role based access control
+* Permission validation
+* Device-level access rules
 
-### IoT Strategy
+## Audit System
 
-MQTT is accepted for device commands and telemetry. BLE provisioning is accepted for mobile-to-device setup. Device simulation is accepted as a first delivery path so development is not blocked by hardware.
+* Record all security actions
+* Immutable audit logs
 
-### Database Strategy
+---
 
-Accepted:
+# SHOULD HAVE REQUIREMENTS
 
-- SQL Server for development
-- SQLite in-memory for tests
-- PostgreSQL as a production option
-- EF Core for persistence
-- One DbContext per module
-- Schema-per-module in one physical database at first
+* Monitoring dashboard
+* Real-time updates via SignalR
+* Notification system (email only initially)
+* Basic scheduling rules for guest access
 
-## Requirements That Need Refinement
+---
 
-These ideas are useful but not yet detailed enough for implementation.
+# NICE TO HAVE REQUIREMENTS
 
-### Homes, Properties, Doors, And Ownership
+* Face verification system
+* Automation engine
+* Advanced reporting
+* SMS and push notifications
+* PDF export
+* Advanced security analytics
 
-The requirements mention homes, properties, doors, and owners, but the aggregate model is not fully defined.
+---
 
-Need decisions:
+# SYSTEM MVP VALUE LOOP
 
-- Is a Home the top-level tenant boundary?
-- Can one user own multiple homes?
-- Can a door exist without a smart lock?
-- Can one smart lock control more than one door?
-- How are guests invited to a home?
+A valid MVP must support:
 
-### Multi-Tenancy
+1. User registers and logs in
+2. User belongs to a Home
+3. Device is registered to Home
+4. Owner assigns access to user
+5. User requests unlock
+6. Backend validates request
+7. MQTT command sent to device
+8. Device executes action
+9. Audit log is recorded
 
-The project implies property-level isolation but does not fully define tenancy.
+---
 
-Need decisions:
+# SECURITY REQUIREMENTS
 
-- Tenant model: Home, Organization, Property, or Account?
-- Can a SystemAdmin see all tenants?
-- Can an Owner invite users across multiple properties?
+* JWT must expire in 15 minutes
+* Refresh tokens must rotate
+* Sessions must be tracked per device
+* Unknown devices require verification
+* All actions must be authorized
+* All security actions must be logged
 
-### Face Verification Provider
+---
 
-Face verification is accepted as a business capability, but implementation provider is not chosen.
+# DEVICE REQUIREMENTS
 
-Need decisions:
+* Devices must be provisioned before use
+* Devices cannot act independently
+* Devices may be offline
+* Commands must be idempotent
 
-- Local model, cloud provider, or mocked provider for phase 1?
-- Where embeddings are generated?
-- What anti-spoofing level is realistic for the academic prototype?
-- What confidence threshold default should be used?
+---
 
-### SMS And Push Notifications
+# PERFORMANCE EXPECTATIONS
 
-Notification types include email, SMS, and push, but providers are not selected.
+* Unlock decision pipeline must complete within acceptable real-time threshold
+* MQTT command delivery must be async and retry-safe
+* System must handle concurrent access requests safely
 
-Need decisions:
+---
 
-- Email provider first: SMTP via MailKit is enough.
-- SMS provider can be deferred.
-- Push notifications can be deferred until mobile app integration.
+# SYSTEM BOUNDARIES
 
-### Reporting And PDF Export
+VERIXORA does NOT include:
 
-Reports and PDF export are useful, but not essential for the first working access-control path.
+* hardware manufacturing
+* cloud identity provider dependency
+* external biometric system dependency (optional only)
+* distributed microservices architecture (not in MVP phase)
 
-Need decisions:
+---
 
-- Which reports are required for MVP?
-- Is CSV export enough for phase 1?
-- PDF export can be deferred unless required by supervisor.
+# USER JOURNEYS
 
-### Automation Engine Safety
+## Owner Journey
 
-Automation can trigger sensitive actions like unlock. This is risky.
+* creates Home
+* adds devices
+* assigns users
+* controls access
 
-Need decisions:
+## Guest Journey
 
-- Should automation be allowed to unlock doors, or only lock and notify?
-- Does automation require owner confirmation for unlock?
-- Are automation executions always audited?
+* receives access
+* uses door within schedule
+* has limited permissions
 
-## Deferred Requirements
+## Technician Journey
 
-These should not be built first because they add cost before the core system is proven.
+* manages device health
+* performs maintenance only
 
-- Full SMS integration
-- Full push notification integration
-- Production-grade face recognition
-- Advanced anti-spoofing
-- Multi-database deployment
-- Cloud-managed infrastructure
-- PDF report generation
-- Firmware update delivery
-- IP whitelist management
-- API key management
-- Complex custom role designer UI
+---
 
-## Rejected Or Changed Requirements
+# DEFERRED REQUIREMENTS
 
-These requirements should be changed to reduce risk.
-
-### SystemAdmin Bypasses Everything
-
-Original idea: SystemAdmin can do everything and bypass all checks.
-
-Decision: SystemAdmin may bypass normal permission checks, but must not bypass audit logging, tenant safety checks, or critical confirmation flows. Every SystemAdmin action must be traceable.
-
-### Devices Execute Commands Independently
-
-Rejected. Devices never decide access. Devices only execute backend-approved commands.
-
-### Web Portal Before Core Backend
-
-Rejected as an implementation priority. The backend domain and API must come first. Web Portal should consume stable APIs after the core workflows exist.
-
-## MVP Definition
-
-The first real MVP should prove one secure end-to-end flow:
-
-1. User registers and logs in.
-2. User receives JWT and refresh token.
-3. Device or smart lock is registered or simulated.
-4. Owner grants user door access.
-5. User requests door unlock.
-6. Backend runs the unlock pipeline.
-7. MQTT command is published to simulator.
-8. Audit log is written.
-9. Monitoring event is produced.
-
-If this works cleanly, the project has a strong enterprise foundation.
+* SMS integration
+* push notifications
+* full automation engine
+* production face recognition
+* multi-region deployment
+* microservices migration
+* advanced reporting suite
