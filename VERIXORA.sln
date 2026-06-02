@@ -174,7 +174,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Domain", "Domain", "{2BA216
 	ProjectSection(SolutionItems) = preProject
 		docs\Domain\Error-Code-Standards.md = docs\Domain\Error-Code-Standards.md
 		docs\Domain\Usage-Patterns.md = docs\Domain\Usage-Patterns.md
-		docs\Domain\User-Aggregate-RootDesign.md = docs\Domain\User-Aggregate-RootDesign.md
+		docs\Domain\User-Aggregate-Root-Design.md = docs\Domain\User-Aggregate-Root-Design.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ADR", "ADR", "{20054396-43A1-43EA-B9CF-3DB56A5F193D}"
