@@ -32,7 +32,5 @@
     <!-- Zero PackageReferences – intentionally empty.
        If a developer adds a package here, the architecture
        validation script will flag it as CRITICAL. -->
-    <ItemGroup>
-    </ItemGroup>
 
 </Project>

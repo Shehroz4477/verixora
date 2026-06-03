@@ -9,6 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{6F0C7A7D-9
 		docs\01-REQUIREMENTS-ASSESSMENT.md = docs\01-REQUIREMENTS-ASSESSMENT.md
 		docs\02-ARCHITECTURE-DECISIONS.md = docs\02-ARCHITECTURE-DECISIONS.md
 		docs\BACKEND-USE-CASES-AND-TESTS.md = docs\BACKEND-USE-CASES-AND-TESTS.md
+		docs\INCIDENT RESPONSE RUNBOOK.md = docs\INCIDENT RESPONSE RUNBOOK.md
 		docs\NEXT-ACTIONS.md = docs\NEXT-ACTIONS.md
 		docs\PROJECT-LOG.md = docs\PROJECT-LOG.md
 		docs\README.md = docs\README.md
@@ -70,9 +71,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SharedKernel", "SharedKernel", "{028AAFA4-10B8-48D2-A937-2FFDE5BAD1BF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SharedKernel.Domain", "SharedKernel.Domain", "{C41F91CF-AB79-481D-93B0-061F81FA18EB}"
-	ProjectSection(SolutionItems) = preProject
-		GlobalUsings.cs = GlobalUsings.cs
-	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel.Domain", "SharedKernel.Domain\SharedKernel.Domain.csproj", "{168403D1-2558-488A-82EC-449AD7D28726}"
 EndProject
