@@ -70,6 +70,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SharedKernel", "SharedKernel", "{028AAFA4-10B8-48D2-A937-2FFDE5BAD1BF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SharedKernel.Domain", "SharedKernel.Domain", "{C41F91CF-AB79-481D-93B0-061F81FA18EB}"
+	ProjectSection(SolutionItems) = preProject
+		GlobalUsings.cs = GlobalUsings.cs
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel.Domain", "SharedKernel.Domain\SharedKernel.Domain.csproj", "{168403D1-2558-488A-82EC-449AD7D28726}"
 EndProject
@@ -97,5 +100,8 @@ Global
 		{028AAFA4-10B8-48D2-A937-2FFDE5BAD1BF} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{C41F91CF-AB79-481D-93B0-061F81FA18EB} = {028AAFA4-10B8-48D2-A937-2FFDE5BAD1BF}
 		{168403D1-2558-488A-82EC-449AD7D28726} = {C41F91CF-AB79-481D-93B0-061F81FA18EB}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6EDB1AD4-14DB-4CFE-B5D9-5E4BD4C0D3BC}
 	EndGlobalSection
 EndGlobal
