@@ -169,11 +169,18 @@ public static class Guard
         if (collection is null)
             throw new ArgumentNullException(parameterName);
 
-        using var enumerator = collection.GetEnumerator();
-        if (!enumerator.MoveNext())
-            throw new ArgumentException(
-                $"'{parameterName}' must contain at least one element.",
-                parameterName);
+        IEnumerator enumerator = collection.GetEnumerator();
+        try
+        {
+            if (!enumerator.MoveNext())
+                throw new ArgumentException(
+                    $"'{parameterName}' must contain at least one element.",
+                    parameterName);
+        }
+        finally
+        {
+            (enumerator as IDisposable)?.Dispose();
+        }
     }
 
     // ----------------------------------------------------------------
