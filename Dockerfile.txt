@@ -33,3 +33,4 @@ EXPOSE 80
 EXPOSE 443
 COPY --from=build /app .
 ENTRYPOINT ["dotnet", "ApiHost.dll"]
+
