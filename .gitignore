@@ -1,46 +1,57 @@
 # ============================================================
-# Summary: Standard .NET / Visual Studio / Docker ignores.
-# Ensures build artifacts, user secrets, and IDE files never
-# enter version control – critical for security (no secrets).
+# VERIXORA â€“ .gitignore
+# ============================================================
+# Summary:
+#   Excludes build output, IDE configs, secrets, and
+#   environment files from Git. This enforces ADR-031
+#   (no secrets in source control) and keeps the repository
+#   clean for all developers regardless of their local tools.
 # ============================================================
 
-## .NET Build & Output
+# --- .NET Build Artifacts ---
+# Why: bin/ and obj/ contain compiled binaries that are
+# regenerated on every build. Committing them causes merge
+# conflicts and bloats the repository.
 [Bb]in/
 [Oo]bj/
-*.user
-*.suo
-*.cache
-*.log
 
-## Visual Studio & Rider
+# --- IDE / Editor Files ---
+# Why: These are personal IDE settings (Visual Studio, Rider,
+# VS Code). Each developer has their own preferences.
 .vs/
 .idea/
+.vscode/
+*.user
+*.suo
 *.swp
 *.sln.docstates
 
-## NuGet packages (do not commit actual packages)
+# --- NuGet ---
+# Why: Packages are restored via dotnet restore. Committing
+# the actual .nupkg files is unnecessary and wastes space.
 **/packages/*
 !**/packages/repositories.config
 
-## EF Core Migrations (generated files tracked by team)
-# Do NOT ignore Migrations folder, it's part of the schema.
-
-## Secrets – NEVER COMMIT (ADR-031)
+# --- Secrets â€“ ADR-031: Secrets Management ---
+# Why: Connection strings, JWT signing keys, and API credentials
+# must NEVER be committed. They are injected at deployment time
+# from Azure Key Vault or AWS Secrets Manager.
 appsettings.*.json
 !appsettings.json
 !appsettings.Development.json
 !appsettings.Testing.json
 !appsettings.Staging.json
 !appsettings.Production.json
-
-## User secrets file (individual dev)
 secrets.json
-
-## Docker & Environment
-.env
 *.env
+
+# --- Docker ---
+# Why: docker-compose.override.yml is for local overrides.
+# .env files may contain credentials.
 docker-compose.override.yml
 
-## OS junk
+# --- OS Generated Files ---
+# Why: OS-specific junk (macOS .DS_Store, Windows Thumbs.db)
+# should never enter the repository.
 .DS_Store
 Thumbs.db

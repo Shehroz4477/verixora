@@ -1,19 +1,59 @@
 <!-- ============================================================
-     Central MSBuild properties for ALL projects.
-     - Enables nullable reference types globally (C# 8+ safety).
-     - Treats warnings as errors for strict quality.
-     - Implicit usings reduce boilerplate.
-     - Sets analysis level to latest (C# 12).
+     VERIXORA – Directory.Build.props
+     ============================================================
+     Summary:
+       This file is automatically imported by every .csproj in
+       the directory tree. It sets common MSBuild properties so
+       we don't repeat them in each project file.
+
+       Key decisions:
+         - net8.0: Latest LTS .NET release.
+         - Nullable enabled: Prevents NullReferenceExceptions
+           at compile time (C# 8+ feature).
+         - ImplicitUsings enabled: Removes boilerplate using
+           statements (C# 10+ feature).
+         - TreatWarningsAsErrors: No warnings allowed in
+           production code.
+         - AnalysisLevel latest: Uses the newest Roslyn
+           analyzers for C# 12.
+         - GenerateDocumentationFile: Produces XML docs for
+           Swagger and IntelliSense (ADR-034).
      ============================================================ -->
 <Project>
     <PropertyGroup>
+        <!-- Target the .NET 8 LTS runtime -->
         <TargetFramework>net8.0</TargetFramework>
+
+        <!-- Enable C# 8+ nullable reference types globally.
+         Every reference type (string, object, etc.) must
+         explicitly declare whether it accepts null.
+         Use case: Prevents accidental null assignments and
+         forces developers to handle null scenarios. -->
         <Nullable>enable</Nullable>
+
+        <!-- ImplicitUsings: Automatically imports common
+         namespaces (System, System.Linq, System.Collections.Generic)
+         into every .cs file. Reduces boilerplate. (C# 10+) -->
         <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Treat compiler warnings as errors.
+         Use case: A warning today is a bug tomorrow.
+         Enforces strict code quality in CI/CD pipeline. -->
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+        <!-- Use the latest C# analysis rules (C# 12 as of .NET 8).
+         Catches modern code smells and suggests improvements. -->
         <AnalysisLevel>latest</AnalysisLevel>
+
+        <!-- Generate XML documentation files for all public APIs.
+         Required by ADR-034 (API Documentation Standard) and
+         used by Swagger to display endpoint descriptions. -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+        <!-- Suppress CS1591: Missing XML comment for publicly
+         visible type or member. We enable docs but suppress
+         this warning to avoid noise; critical APIs are
+         documented manually. -->
         <NoWarn>$(NoWarn);1591</NoWarn>
-        <!-- Missing XML comment suppression for now -->
     </PropertyGroup>
 </Project>

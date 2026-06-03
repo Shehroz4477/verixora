@@ -1,4 +1,19 @@
 {
+    // ============================================================
+    // VERIXORA – global.json
+    // ============================================================
+    // Summary:
+    //   Selects the .NET SDK version for the solution. Every
+    //   developer and CI agent must use this SDK. Prevents
+    //   "works on my machine" issues caused by different SDKs.
+    //
+    //   sdk.version:      Exact SDK to use (8.0.100 = .NET 8.0 LTS).
+    //   sdk.rollForward:  If 8.0.100 is not installed, use the
+    //                      latest 8.0.x feature band. Never
+    //                      roll forward to a major version (9.0+).
+    //                      This balances reproducibility with
+    //                      availability in CI environments.
+    // ============================================================
     "sdk": {
         "version": "8.0.421",
         "rollForward": "latestFeature"

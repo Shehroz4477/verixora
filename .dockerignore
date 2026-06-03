@@ -1,45 +1,86 @@
 # ============================================================
-# .dockerignore
-# Excludes files from the Docker build context that are not
-# needed at runtime, speeding up builds and reducing image size.
+# VERIXORA – .dockerignore
+# ============================================================
+# Summary:
+#   This file tells Docker which files and folders to EXCLUDE
+#   from the build context.  Docker normally copies everything
+#   in the project folder before starting the build.  Excluding
+#   unnecessary files:
+#     - Speeds up the build (less data to transfer)
+#     - Reduces the final image size
+#     - Prevents secrets and local tools from leaking into
+#       the image (security, ADR-031)
+#   The patterns follow standard .gitignore syntax.
 # ============================================================
 
+# --- Version Control ---
+# Git metadata is useless inside a container and could leak
+# commit history.  Always exclude the whole .git folder.
 **/.git
-**/.gitignore
-**/.editorconfig
+.gitignore
+.gitattributes
+
+# --- Editor & IDE files ---
+# These are developer-specific settings.  They must not be
+# packaged into the container because they differ per user.
 **/.vs
 **/.vscode
 **/.idea
-**/*.user
-**/*.suo
-**/*.cache
+*.user
+*.suo
+*.swp
+*.sln.docstates
 
-# Build output (not needed; we build inside the Dockerfile)
+# --- Build artifacts (will be rebuilt inside Docker) ---
+# The Dockerfile runs `dotnet restore` and `dotnet publish` itself.
+# Copying existing bin/obj folders is wasteful and may contain
+# binaries compiled for the wrong platform (e.g., Windows vs Linux).
 **/bin
 **/obj
 
-# NuGet packages (restored in Dockerfile)
+# --- NuGet packages cache ---
+# Packages are restored during `dotnet restore`.  We don't carry
+# a local cache that might be stale or platform-specific.
 **/packages
 
-# Test projects (not needed in runtime image)
+# --- Test projects ---
+# Unit/integration tests are not needed at runtime.  Excluding them
+# saves space and prevents test-specific configuration files from
+# being included.
 tests/
 
-# Documentation & tools
+# --- Documentation & tools ---
+# Markdown files, design docs, and the device simulator are not
+# required for the running API.  The README is kept as an exception
+# (it might be useful for a health-check landing page, but typically
+# it's excluded as well).
 docs/
 tools/
 *.md
-!README.md
+!README.md            # Keep only the root README.md if desired
 
-# Environment & secrets
+# --- Environment files & secrets (ADR-031) ---
+# .env files and environment-specific appsettings.json files often
+# contain secrets (connection strings, API keys).  They MUST be
+# injected at runtime via a secrets manager, never baked into the image.
 *.env
 **/appsettings.*.json
-!**/appsettings.json
+!**/appsettings.json  # Keep the base template (no secrets)
+
+# --- User secrets ---
+# The `dotnet user-secrets` tool stores secrets in a JSON file on the
+# developer's machine.  It must never end up in the container.
 secrets.json
 
-# Docker files themselves
+# --- Docker & Compose files ---
+# Recursive Docker builds are dangerous.  Exclude the Dockerfile itself
+# and any compose files to avoid confusion.
 Dockerfile
 .dockerignore
 docker-compose*.yml
 
-# Node modules (if any frontend was included)
+# --- Node / Frontend (if present) ---
+# The mobile/web apps have their own build pipelines.  Their
+# dependencies should not be in the backend image.
 node_modules/
+.npm

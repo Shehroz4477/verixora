@@ -1,13 +1,30 @@
 <!-- ============================================================
-     Central Package Management (CPM) – NuGet 6.2+.
-     All version numbers live here, avoiding version drift.
+     VERIXORA – Directory.Packages.props
+     ============================================================
+     Summary:
+       Central Package Management (CPM) – NuGet 6.2+ feature.
+       All NuGet package versions are defined HERE, not in
+       individual .csproj files.
+
+       Why: When a vulnerability is patched or a new version
+       released, we update ONE line here instead of hunting
+       through every project. Ensures every module uses the
+       same version of shared dependencies.
+
+       Use case: A security fix in EF Core 8.0.5 – update the
+       version here, all 13 modules get it on next build.
      ============================================================ -->
 <Project>
     <PropertyGroup>
+        <!-- Tells NuGet to use CPM: packages are managed centrally.
+         Projects reference packages without Version attribute. -->
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
+
     <ItemGroup>
-        <!-- ASP.NET Core + EF Core -->
+        <!-- ========================================================
+         ASP.NET Core + EF Core (Data Access)
+         ======================================================== -->
         <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4" />
@@ -15,34 +32,60 @@
         <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.4" />
 
-        <!-- MediatR (CQRS + Domain Events) -->
+        <!-- ========================================================
+         MediatR (CQRS + Domain Events)
+         Why: Decouples command/query handlers from controllers.
+         Domain events are also dispatched via MediatR.
+         ======================================================== -->
         <PackageVersion Include="MediatR" Version="12.2.0" />
         <PackageVersion Include="MediatR.Contracts" Version="2.0.1" />
 
-        <!-- Serilog (structured logging) -->
+        <!-- ========================================================
+         Serilog (Structured Logging – ADR-021)
+         Why: Structured logs with TenantId, UserId, CorrelationId
+         are essential for debugging multi-tenant access issues.
+         ======================================================== -->
         <PackageVersion Include="Serilog.AspNetCore" Version="8.0.1" />
         <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.1" />
         <PackageVersion Include="Serilog.Sinks.Seq" Version="6.0.0" />
         <PackageVersion Include="Serilog.Enrichers.Environment" Version="2.3.0" />
         <PackageVersion Include="Serilog.Enrichers.Thread" Version="3.1.0" />
 
-        <!-- OpenTelemetry -->
+        <!-- ========================================================
+         OpenTelemetry (Distributed Tracing – ADR-021)
+         Why: Every unlock request creates a trace spanning the
+         full 10-step pipeline. Essential for SLA monitoring.
+         ======================================================== -->
         <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
         <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.0" />
         <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.8" />
         <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
 
-        <!-- Rate Limiting -->
+        <!-- ========================================================
+         Rate Limiting (ADR-020)
+         Why: ASP.NET Core built-in rate limiting middleware
+         protects against brute-force and accidental floods.
+         ======================================================== -->
         <PackageVersion Include="System.Threading.RateLimiting" Version="8.0.0" />
 
-        <!-- Feature Flags -->
+        <!-- ========================================================
+         Feature Flags (ADR-029)
+         Why: New features wrapped with feature flags for
+         incremental rollout and emergency kill-switch.
+         ======================================================== -->
         <PackageVersion Include="Microsoft.FeatureManagement.AspNetCore" Version="3.2.0" />
 
-        <!-- Swagger / OpenAPI -->
+        <!-- ========================================================
+         Swagger / OpenAPI (ADR-034)
+         Why: API documentation with XML comments for
+         mobile and web developers. TypeScript generation.
+         ======================================================== -->
         <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
         <PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="6.5.0" />
 
-        <!-- Testing -->
+        <!-- ========================================================
+         Testing Frameworks
+         ======================================================== -->
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
         <PackageVersion Include="xunit" Version="2.7.0" />
         <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.7" />
@@ -53,12 +96,17 @@
         <PackageVersion Include="Testcontainers.PostgreSql" Version="3.8.0" />
         <PackageVersion Include="Testcontainers.Mqtt" Version="3.8.0" />
 
-        <!-- Utilities -->
-        <PackageVersion Include="Argon" Version="1.0.0" />
-        <!-- Password hashing (Argon2id) -->
+        <!-- ========================================================
+         Utilities
+         ======================================================== -->
+        <!-- Argon2id password hashing (ADR security: never store raw passwords) -->
+        <PackageVersion Include="Argon" Version="1.0.3" />
+
+        <!-- ULID: Universally Unique Lexicographically Sortable Identifier.
+         Better than GUID for database indexes (clustered-friendly). -->
         <PackageVersion Include="Ulid" Version="1.3.3" />
-        <!-- Sortable unique IDs -->
+
+        <!-- Polly: Resilience pipeline for transient fault handling (ADR-033) -->
         <PackageVersion Include="Polly.Core" Version="8.3.1" />
-        <!-- Resilience -->
     </ItemGroup>
 </Project>

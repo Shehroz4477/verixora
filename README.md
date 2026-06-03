@@ -1,6 +1,12 @@
-You're right, the `README.md` was listed but not provided. Here's the complete file:
+Approved. Moving to the next file.
 
-### `README.md`
+---
+
+## File #3: `README.md`
+
+**Location:** Solution root  
+**Purpose:** Provides a comprehensive entry point for developers: what Verixora is, how to set it up locally, architectural decisions, project structure, API endpoints, testing commands, and CI/CD pipeline. Acts as the first document anyone reads when joining the project.
+
 ```markdown
 # VERIXORA – Enterprise IoT Smart Security & Access Control Platform
 
@@ -218,4 +224,16 @@ The GitHub Actions pipeline:
 Proprietary – All rights reserved.
 ```
 
-This README provides a complete entry point for any developer joining the project. Should we continue with the next batch of files?
+**C# Concepts & Patterns Referenced:**
+
+| Concept | Where Referenced |
+|--------|------------------|
+| **Modular Monolith** | 13 isolated modules, no cross-module references |
+| **Clean Architecture** | Domain → Application → Infrastructure → Presentation |
+| **CQRS** | Commands and Queries in Application layer |
+| **Domain Events + Integration Events** | In-memory MediatR + PostgreSQL LISTEN/NOTIFY |
+| **RBAC + PBAC** | Hybrid authorization engine |
+| **Nullable Reference Types** | Mandatory project-wide |
+| **Central Package Management** | `Directory.Packages.props` for NuGet versions |
+| **Vertical Slice Architecture** | Each use case as a folder |
+

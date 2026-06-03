@@ -1,36 +1,101 @@
-version: '3.8'
+# ============================================================
+# VERIXORA – docker-compose.yml
+# ============================================================
+# Summary:
+#   Local development stack for the Verixora backend.
+#   Starts three services:
+#     1. api-host    – the ASP.NET Core modular monolith
+#     2. postgres    – PostgreSQL 16 database
+#     3. mosquitto   – MQTT broker for IoT device communication
+#
+#   Why Docker Compose:
+#     - Developers don't need to install PostgreSQL or Mosquitto.
+#     - All services start with a single command.
+#     - Ports and volumes are pre-configured for local dev.
+#     - Environment variables are explicitly set here for clarity
+#       (production secrets come from Key Vault, not this file).
+# ============================================================
+
+version: '3.8'  # Docker Compose file format version
+
 services:
+
+  # --- API Host (Backend) ---
   api-host:
+    # Build the image from the Dockerfile in the current directory.
     build:
       context: .
       dockerfile: Dockerfile
+    # Map container port 80 to host port 5000.
+    # Access: http://localhost:5000
     ports:
       - "5000:80"
+    # Environment variables override appsettings.Development.json.
+    # These are local dev only; production uses Key Vault (ADR-031).
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=verixora;Username=verixora;Password=devpass
+      - Mqtt__BrokerAddress=mosquitto
+      - Mqtt__BrokerPort=1883
+    # Wait for postgres to be healthy before starting the API.
     depends_on:
-      - postgres
-      - mosquitto
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    # Mount source code for hot reload in development.
+    volumes:
+      - ./src:/src
+      - ~/.aspnet/https:/https:ro
 
+  # --- PostgreSQL Database ---
   postgres:
+    # Use the official PostgreSQL 16 image on Alpine (smallest).
     image: postgres:16-alpine
+    # Restart policy: always restart unless explicitly stopped.
+    restart: unless-stopped
+    # Credentials for local dev. Production uses Key Vault (ADR-031).
     environment:
       POSTGRES_USER: verixora
       POSTGRES_PASSWORD: devpass
       POSTGRES_DB: verixora
+    # Expose PostgreSQL on the default port.
     ports:
       - "5432:5432"
+    # Persist database data across container restarts.
+    # Without a volume, all data is lost when the container stops.
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Health check: pg_isready confirms PostgreSQL is accepting connections.
+    # The api-host depends_on uses this to wait before starting.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verixora -d verixora"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  # --- MQTT Broker (Mosquitto) ---
   mosquitto:
+    # Official Eclipse Mosquitto image (v2).
     image: eclipse-mosquitto:2
+    restart: unless-stopped
+    # MQTT default port (1883) and WebSocket port (9001).
+    # 1883: Native MQTT for ESP32 devices.
+    # 9001: WebSocket for browser-based MQTT clients (SignalR fallback).
     ports:
       - "1883:1883"
       - "9001:9001"
+    # Mount Mosquitto configuration file.
+    # See infrastructure/docker/mosquitto.conf
     volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./infrastructure/docker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
 
+# --- Named Volumes ---
 volumes:
+  # PostgreSQL data volume – survives docker-compose down.
   pgdata:
+  # Mosquitto data and log volumes.
+  mosquitto-data:
+  mosquitto-log:
