@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  api-host:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=verixora;Username=verixora;Password=devpass
+    depends_on:
+      - postgres
+      - mosquitto
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: verixora
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: verixora
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+volumes:
+  pgdata:
