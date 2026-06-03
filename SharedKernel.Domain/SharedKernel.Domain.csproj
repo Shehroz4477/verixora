@@ -1,0 +1,38 @@
+﻿<!-- ============================================================
+     VERIXORA – SharedKernel.Domain.csproj
+     ============================================================
+     Summary:
+       The SharedKernel.Domain project is the foundation of the
+       modular monolith. It contains only abstract base classes,
+       interfaces, and pure helpers that every module's Domain
+       layer references.
+
+       Rules:
+         - NO project references (zero dependencies).
+         - NO NuGet packages (BCL only).
+         - Contains ONLY: Entity, ValueObject, IAggregateRoot,
+           Enumeration, IDomainEvent, Guard, Result<T>.
+         - Must not leak any external type.
+
+       Why:
+         - Keeps the core stable and free from version conflicts.
+         - All modules agree on a single definition of "Entity"
+           and "ValueObject" – no duplication.
+         - Pure BCL ensures no coupling to databases, web
+           frameworks, or serializers.
+     ============================================================ -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- Inherits TargetFramework=net8.0, Nullable=enable,
+         ImplicitUsings=enable from Directory.Build.props.
+         No extra properties needed. -->
+    </PropertyGroup>
+
+    <!-- Zero PackageReferences – intentionally empty.
+       If a developer adds a package here, the architecture
+       validation script will flag it as CRITICAL. -->
+    <ItemGroup>
+    </ItemGroup>
+
+</Project>
