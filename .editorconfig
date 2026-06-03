@@ -1,0 +1,27 @@
+# ============================================================
+# Enforces consistent coding style across the team.
+# Ties into the C# compiler and IDE analysers.
+# ============================================================
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.cs]
+# C# conventions: latest C# 12 features with strict nullability.
+dotnet_style_predefined_type_for_locals_parameters_members = true:silent
+csharp_style_var_for_built_in_types = false:silent
+csharp_style_var_when_type_is_apparent = true:silent
+dotnet_style_readonly_field = true:suggestion
+csharp_prefer_braces = true:silent
+csharp_style_expression_bodied_methods = true:silent
+csharp_style_pattern_matching_over_as_with_null_check = true:error
+csharp_style_throw_expression = true:error
+csharp_style_conditional_delegate_call = true:error
+csharp_style_prefer_null_check_over_type_check = true:error
+csharp_nullable_reference_types = true
