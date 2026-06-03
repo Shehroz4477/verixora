@@ -1,24 +1,46 @@
-# Build outputs
-bin/
-obj/
-.vs/
+# ============================================================
+# Summary: Standard .NET / Visual Studio / Docker ignores.
+# Ensures build artifacts, user secrets, and IDE files never
+# enter version control – critical for security (no secrets).
+# ============================================================
 
-# User-specific files
+## .NET Build & Output
+[Bb]in/
+[Oo]bj/
 *.user
 *.suo
-
-# Logs
+*.cache
 *.log
 
-# Rider / VS Code
+## Visual Studio & Rider
+.vs/
 .idea/
-.vscode/
+*.swp
+*.sln.docstates
 
-# ASP.NET Core
-wwwroot/lib/
+## NuGet packages (do not commit actual packages)
+**/packages/*
+!**/packages/repositories.config
 
-# EF Core
-Migrations/
+## EF Core Migrations (generated files tracked by team)
+# Do NOT ignore Migrations folder, it's part of the schema.
 
-# Secrets
+## Secrets – NEVER COMMIT (ADR-031)
 appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+!appsettings.Testing.json
+!appsettings.Staging.json
+!appsettings.Production.json
+
+## User secrets file (individual dev)
+secrets.json
+
+## Docker & Environment
+.env
+*.env
+docker-compose.override.yml
+
+## OS junk
+.DS_Store
+Thumbs.db
