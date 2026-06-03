@@ -1,0 +1,64 @@
+<!-- ============================================================
+     Central Package Management (CPM) – NuGet 6.2+.
+     All version numbers live here, avoiding version drift.
+     ============================================================ -->
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- ASP.NET Core + EF Core -->
+        <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
+        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.4" />
+
+        <!-- MediatR (CQRS + Domain Events) -->
+        <PackageVersion Include="MediatR" Version="12.2.0" />
+        <PackageVersion Include="MediatR.Contracts" Version="2.0.1" />
+
+        <!-- Serilog (structured logging) -->
+        <PackageVersion Include="Serilog.AspNetCore" Version="8.0.1" />
+        <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.1" />
+        <PackageVersion Include="Serilog.Sinks.Seq" Version="6.0.0" />
+        <PackageVersion Include="Serilog.Enrichers.Environment" Version="2.3.0" />
+        <PackageVersion Include="Serilog.Enrichers.Thread" Version="3.1.0" />
+
+        <!-- OpenTelemetry -->
+        <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.8" />
+        <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
+
+        <!-- Rate Limiting -->
+        <PackageVersion Include="System.Threading.RateLimiting" Version="8.0.0" />
+
+        <!-- Feature Flags -->
+        <PackageVersion Include="Microsoft.FeatureManagement.AspNetCore" Version="3.2.0" />
+
+        <!-- Swagger / OpenAPI -->
+        <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+        <PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="6.5.0" />
+
+        <!-- Testing -->
+        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+        <PackageVersion Include="xunit" Version="2.7.0" />
+        <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.7" />
+        <PackageVersion Include="FluentAssertions" Version="6.12.0" />
+        <PackageVersion Include="NSubstitute" Version="5.1.0" />
+        <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.16" />
+        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.4" />
+        <PackageVersion Include="Testcontainers.PostgreSql" Version="3.8.0" />
+        <PackageVersion Include="Testcontainers.Mqtt" Version="3.8.0" />
+
+        <!-- Utilities -->
+        <PackageVersion Include="Argon" Version="1.0.0" />
+        <!-- Password hashing (Argon2id) -->
+        <PackageVersion Include="Ulid" Version="1.3.3" />
+        <!-- Sortable unique IDs -->
+        <PackageVersion Include="Polly.Core" Version="8.3.1" />
+        <!-- Resilience -->
+    </ItemGroup>
+</Project>
