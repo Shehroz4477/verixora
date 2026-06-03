@@ -1,0 +1,45 @@
+# ============================================================
+# .dockerignore
+# Excludes files from the Docker build context that are not
+# needed at runtime, speeding up builds and reducing image size.
+# ============================================================
+
+**/.git
+**/.gitignore
+**/.editorconfig
+**/.vs
+**/.vscode
+**/.idea
+**/*.user
+**/*.suo
+**/*.cache
+
+# Build output (not needed; we build inside the Dockerfile)
+**/bin
+**/obj
+
+# NuGet packages (restored in Dockerfile)
+**/packages
+
+# Test projects (not needed in runtime image)
+tests/
+
+# Documentation & tools
+docs/
+tools/
+*.md
+!README.md
+
+# Environment & secrets
+*.env
+**/appsettings.*.json
+!**/appsettings.json
+secrets.json
+
+# Docker files themselves
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Node modules (if any frontend was included)
+node_modules/
