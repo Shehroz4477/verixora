@@ -1,22 +1,26 @@
-# VERIXORA ITERATION 3 – SMART LOCK CONTROL & UNLOCK PIPELINE
+# VERIXORA ITERATION 3 – SMART LOCK CONTROL & UNLOCK PIPELINE (FINAL VERSION)
 
 ---
 
 ## ITERATION OBJECTIVE
 
-Implement smart lock control (lock/unlock/emergency lock), the full 10-step unlock decision pipeline, idempotency for all device commands, authorization caching, unlock-specific rate limiting, and MQTT command publishing.
+Implement smart lock control (lock/unlock/emergency lock), the full 10-step unlock decision pipeline, idempotency for all device commands, authorization caching, unlock-specific rate limiting, MQTT command publishing, and integration event contracts.
 
 By the end of Iteration 3:
 
 - Lock, unlock, and emergency lock commands work via MQTT.
 - Full 10-step unlock pipeline executes in fixed order (cheap to expensive).
 - Schedule validation runs early (step 3).
+- API key authentication bypasses session check (step 2).
 - Idempotency keys prevent duplicate command execution.
 - Authorization decisions cached per session for 1 minute.
+- API key evaluations are NOT cached.
 - Unlock burst rate limit active (5 req / 10 sec per user).
 - Pipeline completes within 200ms p95 (excluding MQTT round-trip).
+- Integration event contracts defined for SmartLocks module.
 - Mobile app supports lock/unlock with real-time status via SignalR.
 - Web Portal supports admin lock management.
+- Offline unlock is explicitly NOT supported.
 
 ---
 
@@ -56,12 +60,14 @@ By the end of Iteration 3:
   - `CommandId` (Guid, idempotency key)
   - `CommandType` (enum: Lock, Unlock, EmergencyLock)
   - `RequestedBy` (Guid, UserId)
+  - `AuthType` (enum: JWT, ApiKey)
   - `RequestedAt` (DateTimeOffset)
   - `Status` (enum: Pending, Executed, Failed, Duplicate)
 - `UnlockRequest` entity:
   - `Id` (Guid)
   - `SmartLockId` (Guid)
-  - `UserId` (Guid)
+  - `UserId` (Guid?)
+  - `ApiKeyId` (Guid?)
   - `PipelineResult` (string, JSON of step results)
   - `Passed` (bool)
   - `FailureReason` (string?)
@@ -88,8 +94,8 @@ Fixed order, cheap to expensive:
 
 | Step | Name | Module | Description |
 |------|------|--------|-------------|
-| 1 | JwtValidation | Sessions | Validates JWT is present and not expired |
-| 2 | SessionValidation | Sessions | Validates session exists and is active |
+| 1 | JwtOrApiKeyValidation | Identity | Validates JWT or API key |
+| 2 | SessionValidation | Identity | Validates session (skipped for API keys) |
 | 3 | ScheduleValidation | Authorization | Checks user schedule/time restrictions |
 | 4 | UserStatusValidation | Identity | Checks user is active, not locked out |
 | 5 | RoleValidation | Authorization | Checks user has a valid role |
@@ -121,7 +127,7 @@ Each step returns `PipelineStepResult { Passed, FailureReason }`.
 
 **SmartLocks.Application – Decorators:**
 - `IdempotencyCommandDecorator` – wraps command handlers, checks idempotency store.
-- `AuthorizationCacheDecorator` – wraps authorization checks, caches results.
+- `AuthorizationCacheDecorator` – wraps authorization checks, caches results (skipped for API keys).
 
 ### 1.4 Backend – Infrastructure Layer
 
@@ -154,18 +160,23 @@ Each step returns `PipelineStepResult { Passed, FailureReason }`.
   - `GET /api/v1/smartlocks/{id}/history` – get unlock history.
   - `PUT /api/v1/smartlocks/{id}/auto-lock` – update auto-lock timer.
 
-### 1.6 Backend – Contracts
+### 1.6 Backend – Contracts (including Integration Events)
 
 **SmartLocks.Contracts:**
 - `Requests/`: `UnlockRequest`, `LockRequest`, `EmergencyLockRequest`, `UpdateAutoLockRequest`.
 - `Responses/`: `SmartLockResponse`, `SmartLockStatusResponse`, `UnlockHistoryResponse`, `UnlockResultResponse`.
+- `IntegrationEvents/`:
+  - `DoorUnlockedIntegrationEvent`
+  - `DoorLockedIntegrationEvent`
+  - `UnlockDeniedIntegrationEvent`
+  - `UnlockPipelineCompletedIntegrationEvent`
 
 ### 1.7 ApiHost Updates
 
 - Add unlock burst rate limit policy: 5 requests per 10 seconds per user.
 - Register `IdempotencyMiddleware` (checks `Idempotency-Key` header on state-changing endpoints).
 - Wire SignalR hub for real-time lock status updates.
-- Register `AuthorizationCacheDecorator` in DI.
+- Register `AuthorizationCacheDecorator` in DI (skip cache for API keys).
 - Register `IdempotencyCommandDecorator` in DI.
 
 ### 1.8 Mobile App
@@ -174,6 +185,7 @@ Each step returns `PipelineStepResult { Passed, FailureReason }`.
 - **Lock History Screen:** recent unlock/lock events.
 - **SignalR Service:** real-time status updates.
 - **Auto-Lock Settings:** configure timer.
+- **No offline unlock:** UI disables lock controls when connectivity is lost.
 
 ### 1.9 Web Portal
 
@@ -189,6 +201,7 @@ Each step returns `PipelineStepResult { Passed, FailureReason }`.
 ### 2.1 SmartLocks.Domain (New Files)
 ```
 SmartLocks.Domain/
++-- (existing files from Iteration 0)
 +-- Entities/
 |   +-- SmartLock.cs
 |   +-- UnlockRequest.cs
@@ -196,6 +209,7 @@ SmartLocks.Domain/
 |   +-- LockState.cs
 |   +-- LockCommandType.cs
 |   +-- LockCommandStatus.cs
+|   +-- AuthType.cs
 +-- ValueObjects/
 |   +-- LockCommand.cs
 |   +-- PipelineStepResult.cs
@@ -216,6 +230,7 @@ SmartLocks.Domain/
 ### 2.2 SmartLocks.Application (New Files)
 ```
 SmartLocks.Application/
++-- (existing files from Iteration 0)
 +-- Commands/
 |   +-- UnlockDoor/
 |   |   +-- UnlockDoorCommand.cs
@@ -249,7 +264,7 @@ SmartLocks.Application/
 |   +-- IUnlockPipelineService.cs
 |   +-- UnlockPipelineService.cs
 |   +-- Steps/
-|       +-- JwtValidationStep.cs
+|       +-- JwtOrApiKeyValidationStep.cs
 |       +-- SessionValidationStep.cs
 |       +-- ScheduleValidationStep.cs
 |       +-- UserStatusValidationStep.cs
@@ -278,6 +293,7 @@ SmartLocks.Application/
 ### 2.3 SmartLocks.Infrastructure (New Files)
 ```
 SmartLocks.Infrastructure/
++-- (existing files from Iteration 0)
 +-- Persistence/
 |   +-- SmartLocksDbContext.cs (updated)
 |   +-- Configurations/
@@ -300,8 +316,9 @@ SmartLocks.Infrastructure/
 ### 2.4 SmartLocks.Presentation (New Files)
 ```
 SmartLocks.Presentation/
++-- (existing files from Iteration 0)
 +-- Controllers/
-    +-- SmartLockController.cs
+|   +-- SmartLockController.cs
 +-- Hubs/
     +-- LockStatusHub.cs
 ```
@@ -309,16 +326,22 @@ SmartLocks.Presentation/
 ### 2.5 SmartLocks.Contracts (New Files)
 ```
 SmartLocks.Contracts/
++-- (existing files from Iteration 0)
 +-- Requests/
 |   +-- UnlockRequest.cs
 |   +-- LockRequest.cs
 |   +-- EmergencyLockRequest.cs
 |   +-- UpdateAutoLockRequest.cs
 +-- Responses/
-    +-- SmartLockResponse.cs
-    +-- SmartLockStatusResponse.cs
-    +-- UnlockHistoryResponse.cs
-    +-- UnlockResultResponse.cs
+|   +-- SmartLockResponse.cs
+|   +-- SmartLockStatusResponse.cs
+|   +-- UnlockHistoryResponse.cs
+|   +-- UnlockResultResponse.cs
++-- IntegrationEvents/
+    +-- DoorUnlockedIntegrationEvent.cs
+    +-- DoorLockedIntegrationEvent.cs
+    +-- UnlockDeniedIntegrationEvent.cs
+    +-- UnlockPipelineCompletedIntegrationEvent.cs
 ```
 
 ### 2.6 ApiHost (Modified Files)
@@ -328,34 +351,28 @@ ApiHost/
 |   +-- Add unlock burst rate limit policy
 |   +-- Register IdempotencyMiddleware
 |   +-- Map SignalR LockStatusHub
+|   +-- Register API key authentication handler
 +-- Middleware/
-|   +-- IdempotencyMiddleware.cs (moved from BuildingBlocks or activated)
+|   +-- IdempotencyMiddleware.cs
 +-- Extensions/
     +-- ServiceCollectionExtensions.cs (updated)
     +-- ApplicationBuilderExtensions.cs (updated)
-```
-
-### 2.7 BuildingBlocks Updates
-```
-BuildingBlocks.Infrastructure/
-+-- Idempotency/
-    +-- IdempotencyMiddleware.cs (activated, registered in pipeline)
 ```
 
 ---
 
 ## PHASE 3: INTEGRATION
 
-- Wire SmartLocks module DI into ApiHost (`services.AddSmartLocksModule()`).
+- Wire SmartLocks module DI into ApiHost.
 - Run EF Core migrations for SmartLocks schema.
-- Configure unlock burst rate limit policy in ApiHost.
+- Configure unlock burst rate limit policy.
 - Register idempotency decorator for all command handlers.
-- Register authorization cache decorator.
+- Register authorization cache decorator (skip cache for API keys).
 - Wire SignalR hub for real-time lock status.
 - Connect MQTT publisher to broker.
 - Mobile app connects to SignalR hub for status updates.
 - Web portal connects to SignalR hub.
-- CI pipeline runs all new tests including performance SLA check.
+- CI pipeline runs all new tests including contract tests and performance SLA check.
 
 ---
 
@@ -368,6 +385,7 @@ BuildingBlocks.Infrastructure/
 - `LockCommand_Duplicate_ShouldBeDetected`
 - `UnlockRequest_PipelinePassed_ShouldRecord`
 - `UnlockRequest_PipelineFailed_ShouldRecordReason`
+- `LockCommand_ApiKeyAuth_ShouldRecordAuthType`
 
 ### 4.2 Application Tests
 - `Unlock_ValidRequest_ShouldSucceed`
@@ -378,26 +396,38 @@ BuildingBlocks.Infrastructure/
 - `Unlock_DuplicateIdempotencyKey_ShouldReturnSameResult`
 - `Unlock_RateLimitExceeded_ShouldReturn429`
 - `Unlock_FaceVerificationRequired_ShouldRunLast`
+- `Unlock_ApiKeyAuth_ShouldBypassSessionCheck`
+- `Unlock_ApiKeyAuth_ShouldNotCacheAuthorization`
 - `Lock_ShouldSucceedAndAudit`
 - `EmergencyLock_AdminOnly_ShouldSucceed`
 - `EmergencyLock_NonAdmin_ShouldFail`
 - `Pipeline_AllSteps_ShouldExecuteInOrder`
+- `OfflineUnlock_ShouldNotBeSupported`
 
 ### 4.3 Integration Tests
 - `SmartLockController_Unlock_ShouldReturn200`
 - `SmartLockController_DuplicateUnlock_ShouldReturn200_SameResult`
 - `SmartLockController_RateLimit_ShouldReturn429`
+- `SmartLockController_ApiKeyUnlock_ShouldBypassSession`
 - `MqttPublisher_ShouldSendCommand`
 - `IdempotencyStore_ShouldPersistAndRetrieve`
 - `AuthorizationCache_ShouldCacheAndInvalidate`
+- `AuthorizationCache_ApiKey_ShouldNotCache`
 
-### 4.4 Performance Tests
+### 4.4 Contract Tests
+- `SmartLocks_Contracts_ShouldMatchPublishedEvents`
+- `SmartLocks_IntegrationEvents_ShouldContainRequiredFields`
+
+### 4.5 Performance Tests
 - `UnlockPipeline_ShouldCompleteWithin200ms`
 - `UnlockPipeline_UnderConcurrentLoad_ShouldMeetSLA`
+- `UnlockPipeline_ApiKeyAuth_ShouldMeetSLA`
 
-### 4.5 E2E Tests (Mobile)
+### 4.6 E2E Tests (Mobile)
 - Tap unlock → pipeline executes → door unlocks → status updates via SignalR.
 - Tap unlock twice → duplicate response, door unlocks once.
+- API key unlock → bypasses session → door unlocks → status updates.
+- Connectivity lost → unlock button disabled.
 
 ---
 
@@ -417,11 +447,15 @@ BuildingBlocks.Infrastructure/
 - [ ] Lock, unlock, and emergency lock commands work.
 - [ ] 10-step pipeline executes in correct order.
 - [ ] Schedule validation at step 3 (fails fast).
+- [ ] API key authentication bypasses session check (step 2).
 - [ ] Idempotency keys prevent duplicate execution.
-- [ ] Authorization cached per session for 1 minute.
+- [ ] Authorization cached per session for 1 minute (not for API keys).
 - [ ] Unlock burst rate limit enforced (5/10sec).
 - [ ] Pipeline completes within 200ms p95.
 - [ ] SignalR pushes real-time status updates.
+- [ ] Offline unlock not supported.
+- [ ] Integration event contracts defined.
+- [ ] Contract tests pass.
 - [ ] Mobile app completes unlock flow.
 - [ ] Web portal supports admin lock management.
 - [ ] All tests pass including performance SLA.
@@ -434,29 +468,24 @@ BuildingBlocks.Infrastructure/
 | ---------------------------------- | --------------------------------------- |
 | Smart lock control                 | Lock, unlock, emergency lock            |
 | 10-step unlock pipeline            | Full implementation, fixed order        |
+| API key auth bypass session        | Step 2 skipped for API keys             |
 | Schedule validation early          | Step 3 in pipeline                      |
 | Idempotency keys (ADR-016)         | Decorator + store, 24h retention        |
 | Authorization caching (ADR-019)    | Decorator, 1min TTL, event invalidation |
+| API key no cache                   | API key evaluations always fresh        |
 | Rate limiting – unlock burst       | 5 req/10 sec per user                   |
 | Performance SLA (200ms p95)        | Benchmarked and enforced                |
 | SignalR real-time updates          | LockStatusHub                           |
 | MQTT command execution             | MqttCommandPublisher                    |
+| Offline unlock prohibition         | Enforced, no offline capability         |
+| Integration event contracts        | SmartLocks.Contracts/IntegrationEvents  |
 
 ---
 
-## NEW FILE INVENTORY
+**ITERATION 3 COMPLETE.**
 
-| Layer | New Files |
-|-------|-----------|
-| SmartLocks.Domain | 16 |
-| SmartLocks.Application | 31 |
-| SmartLocks.Infrastructure | 12 |
-| SmartLocks.Presentation | 2 |
-| SmartLocks.Contracts | 8 |
-| ApiHost (modified) | 4 |
-| BuildingBlocks (modified) | 1 |
-| **Total New/Modified** | **74** |
-
----
-
-**ITERATION 3 DOCUMENT COMPLETE**
+All improvements integrated:
+- Integration event contracts (SmartLocks)
+- API key auth bypass session
+- API key auth no caching
+- Offline unlock prohibition

@@ -1,4 +1,4 @@
-# VERIXORA MASTER SPECIFICATION (FINAL - WITH ROADMAP - ASCII SAFE)
+# VERIXORA MASTER SPECIFICATION (FINAL VERSION)
 
 ---
 
@@ -8,8 +8,8 @@ VERIXORA is an enterprise IoT smart security and physical access control platfor
 
 The system controls physical access using smart locks and IoT devices with backend-driven decision making.
 
-CORE PRINCIPLE:  
-The backend is the single source of truth for all security decisions.  
+CORE PRINCIPLE:
+The backend is the single source of truth for all security decisions.
 Devices are passive executors only.
 
 ---
@@ -18,7 +18,7 @@ Devices are passive executors only.
 
 VERIXORA is a multi-tenant system.
 
-TENANT ROOT ENTITY: Home  
+TENANT ROOT ENTITY: Home
 
 A Home is the primary isolation boundary.
 
@@ -49,6 +49,8 @@ OPERATIONAL COMPONENTS:
 - Metrics: Prometheus endpoint
 - Distributed tracing: OpenTelemetry
 - CI/CD: GitHub Actions
+- Secrets management: Azure Key Vault / AWS Secrets Manager
+- Containerization: Docker + docker-compose (dev), Kubernetes (prod)
 
 ---
 
@@ -60,12 +62,14 @@ VERIXORA manages:
 - Physical device management (ESP32)
 - Smart lock control
 - Secure provisioning
-- Real time monitoring
 - Audit logging
 - Notifications
 - Automation rules
 - Security policies
 - Optional face verification
+- API key authentication for service accounts
+- Device decommissioning
+- Offline mode (documented limitation)
 
 ---
 
@@ -78,13 +82,13 @@ VERIXORA uses:
 - CQRS pattern
 - Domain events and integration events
 
-MODULE ISOLATION RULE:  
-No module may directly reference another module.  
+MODULE ISOLATION RULE:
+No module may directly reference another module.
 
 Cross-module communication must use:
 - Domain Events
 - Integration Events
-- Contracts Layer
+- Contracts Layer (including IntegrationEvents folder)
 
 EVENT BUS IMPLEMENTATION:
 - Domain Events: in-memory mediator (MediatR) inside each module.
@@ -95,19 +99,21 @@ EVENT BUS IMPLEMENTATION:
 # MODULE CATALOG
 
 Core modules:
-- Identity
+- Identity (includes Session management)
 - Authorization
-- Sessions
 - Devices
 - Provisioning
 - SmartLocks
 - Monitoring
 - AuditLogs
 - Notifications
-- Reports (read-only, deferred to post-MVP)
+- Reports (read-only queries, deferred to post-MVP)
 - Automation
 - Security
 - FaceVerification
+
+MODULE NOTE:
+The Sessions module has been merged into Identity. Session entities (Session, RefreshToken, TrustedDevice) are owned by Identity.Domain. This eliminates a thin module with no independent domain logic.
 
 ---
 
@@ -116,13 +122,17 @@ Core modules:
 | Entity         | Owner Module           |
 | -------------- | ---------------------- |
 | User           | Identity               |
-| Home           | Identity / Tenant Core |
+| Home           | Identity               |
+| Session        | Identity               |
+| RefreshToken   | Identity               |
+| TrustedDevice  | Identity               |
+| ApiKey         | Identity               |
 | Device         | Devices                |
 | SmartLock      | SmartLocks             |
-| Session        | Sessions               |
 | AuditLog       | AuditLogs              |
 | Permission     | Authorization          |
 | AutomationRule | Automation             |
+| FirmwarePackage| Security               |
 
 ---
 
@@ -136,7 +146,9 @@ RULES:
 - Devices are NOT trusted.
 - Backend enforces all decisions.
 - All critical actions must be audited.
-- Data at rest encryption: AES-256 column-level encryption for all PII (emails, phone numbers, face embeddings) and audit logs. Implemented via EF Core value converters.
+- Data at rest encryption: AES-256 column-level encryption for all PII (emails, phone numbers, face embeddings) and audit logs.
+- API keys supported for machine-to-machine authentication with scoped permissions.
+- Secrets never stored in configuration files; use secrets manager.
 
 ---
 
@@ -146,30 +158,32 @@ VERIXORA uses hybrid authorization:
 - RBAC (Role Based Access Control)
 - PBAC (Policy Based Access Control)
 - Device level constraints
+- API key scoped access (service accounts)
 
 EVALUATION ORDER (STRICT):
 1. Explicit DENY policies
 2. Device level restrictions
-3. Policy based rules (PBAC)
-4. Role based permissions (RBAC)
-5. Explicit allow rules
+3. API key scope restrictions
+4. Policy based rules (PBAC)
+5. Role based permissions (RBAC)
+6. Explicit allow rules
 
 DENY ALWAYS WINS.
 
 AUTHORIZATION CACHING:
 - Successful permission evaluations are cached per session for 1 minute.
 - Cache invalidated on role/permission change via domain event.
-- Implemented as a decorator around the authorization service.
+- API key evaluations are not cached (always re-evaluated).
 
 ---
 
 # UNLOCK DECISION ENGINE (OPTIMISED)
 
-All door unlock requests must pass through this fixed evaluation order.  
+All door unlock requests must pass through this fixed evaluation order.
 Steps are ordered cheap-to-expensive, with time-based checks early.
 
-1. JWT validation
-2. Session validation
+1. JWT validation (or API key validation)
+2. Session validation (skipped for API keys)
 3. Schedule validation (moved early to fail fast)
 4. User status validation
 5. Role validation
@@ -225,6 +239,10 @@ OTA FIRMWARE UPDATES:
 - ESP32 verifies signature before flashing.
 - Backend stores signed image and distributes only verified binaries.
 
+DEVICE DECOMMISSIONING:
+- DecommissionDevice command revokes MQTT tokens, removes WiFi credentials, marks device as decommissioned.
+- Decommissioned devices cannot be re-activated without re-provisioning.
+
 ---
 
 # SMART LOCK RULES
@@ -239,6 +257,22 @@ RULES:
 - Sensitive locks require face verification.
 - All actions are audited.
 - Unlock requests are rate-limited (see Rate Limiting section).
+- Offline mode is NOT supported. The mobile device must have connectivity to the backend to perform any lock operation. This is a security decision.
+
+---
+
+# OFFLINE MODE STRATEGY
+
+VERIXORA does NOT support offline unlock operations.
+
+RATIONALE:
+- The backend is the single source of truth for all security decisions.
+- Offline unlock would require caching authorization policies on the mobile device, violating the passive device model.
+- Cached policies could be stale, allowing unauthorized access if permissions were revoked.
+
+FUTURE CONSIDERATION:
+- If offline support is required in the future, it must use short-lived cached tokens with mandatory sync-before-unlock and full audit reconciliation on reconnect.
+- This would be a major architectural change requiring a new ADR.
 
 ---
 
@@ -253,6 +287,9 @@ DOMAIN EVENTS EXAMPLES:
 - DeviceOffline
 - AccessDenied
 - RolePermissionChanged (triggers auth cache invalidation)
+
+INTEGRATION EVENTS:
+Each module's Contracts project includes an IntegrationEvents folder with cross-module event DTOs. Events are delivered via PostgreSQL LISTEN/NOTIFY (or RabbitMQ in future).
 
 RULE: Events are immutable and used for monitoring, automation, and audit history.
 
@@ -275,8 +312,9 @@ ACTIONS:
 
 SAFETY RULES:
 - No infinite loops
-- Execution depth limits
+- Execution depth limits (max 10)
 - All actions are audited
+- Suspicious patterns trigger alerts (see Suspicious Activity Detection)
 
 ---
 
@@ -308,6 +346,28 @@ REQUIRED DATA:
 - Result
 - Metadata
 
+AUDIT LOG RETENTION:
+- Operational database retains audit logs for 90 days.
+- AuditLogRetentionJob archives logs older than 90 days to cold storage (Azure Blob / AWS S3).
+- Archived logs are retained for 7 years for compliance.
+- Archived logs remain encrypted and immutable.
+
+---
+
+# SUSPICIOUS ACTIVITY DETECTION
+
+The Monitoring module includes a SuspiciousActivityDetector that analyzes audit patterns and raises alerts:
+
+DETECTION RULES:
+- X failed unlock attempts in Y minutes from same user (default: 5 in 10 minutes)
+- X failed login attempts in Y minutes from same IP (default: 10 in 5 minutes)
+- Device offline for more than X minutes (default: 30 minutes)
+- Multiple devices in same Home going offline simultaneously
+- Unlock attempts outside scheduled hours
+- API key usage from new IP address
+
+Alert severity: Warning for thresholds, Critical for repeated patterns.
+
 ---
 
 # DATABASE STRATEGY
@@ -318,6 +378,8 @@ REQUIRED DATA:
 - PostgreSQL production recommended
 - SQLite for testing
 - Read-only replicas allowed for Reports module (post-MVP)
+- EnableRetryOnFailure configured for transient fault handling
+- Migration strategy: backward-compatible only, expand-contract pattern for breaking changes
 
 ---
 
@@ -337,6 +399,21 @@ REQUIRED DATA:
 - Max trusted devices per user: 5
 - Session stores device fingerprint (User-Agent, OS, screen resolution hash). If fingerprint changes dramatically mid-session, force re-login.
 - Token rotation required.
+- API keys: long-lived, scoped by permissions, stored hashed, can be revoked individually.
+
+---
+
+# API KEY AUTHENTICATION
+
+VERIXORA supports machine-to-machine authentication via API keys.
+
+RULES:
+- API keys are scoped to a Home and have specific permissions.
+- API keys are stored hashed (SHA-256) in the database.
+- API key authentication bypasses session checks in the pipeline (step 2 skipped).
+- API key usage is audited with the key ID.
+- API keys can be created, revoked, and rotated by Home Owners.
+- Max 10 API keys per Home.
 
 ---
 
@@ -347,6 +424,9 @@ REQUIRED DATA:
 - No cross-home data leakage.
 - Every unlock attempt is logged.
 - No device can bypass backend validation.
+- All PII and audit logs are encrypted at rest.
+- Secrets are never stored in configuration files.
+- No offline unlock capability.
 
 ---
 
@@ -355,6 +435,7 @@ REQUIRED DATA:
 Global Rate Limiting:
 - Per user: 100 requests/min
 - Per IP: 200 requests/min
+- Per API key: 500 requests/min
 
 Unlock Endpoint Specific:
 - Burst limit: 5 requests per 10 seconds per user.
@@ -384,6 +465,10 @@ Metrics:
 Tracing:
 - OpenTelemetry distributed tracing. Every unlock request creates a trace spanning the full pipeline.
 
+Alerting:
+- AlertManager rules defined for critical thresholds (latency, error rate, device offline, failed attempts).
+- Pre-built Grafana dashboard for SLA monitoring.
+
 ---
 
 # BACKUP & DISASTER RECOVERY
@@ -398,9 +483,32 @@ Tracing:
 - GitHub Actions workflow:
   - Build
   - Run unit + integration tests
+  - Run contract tests
+  - Run architecture validation script
   - Deploy to staging
   - Smoke tests (unlock flow)
   - Manual approval for production deployment
+
+---
+
+# ENVIRONMENTS
+
+| Environment | Purpose | Configuration Source |
+|-------------|---------|---------------------|
+| Development | Local development | appsettings.Development.json + secrets manager dev |
+| Testing | CI/CD test runs | appsettings.Testing.json + secrets manager test |
+| Staging | Pre-production validation | appsettings.Staging.json + secrets manager staging |
+| Production | Live system | appsettings.Production.json + secrets manager prod |
+
+Secrets (connection strings, JWT keys, MQTT credentials) are never stored in appsettings files. They are retrieved from a secrets manager (Azure Key Vault or AWS Secrets Manager).
+
+---
+
+# CONTAINERIZATION
+
+- Dockerfile provided for ApiHost.
+- docker-compose.yml for local development includes: ApiHost, PostgreSQL, MQTT broker (Mosquitto).
+- Production deployment via Kubernetes manifests (post-MVP).
 
 ---
 
@@ -416,6 +524,8 @@ FIRST WORKING SYSTEM MUST SUPPORT:
 7. Audit logging
 8. Basic monitoring (health checks + structured logs)
 9. Rate limiting on unlock endpoints
+10. API key authentication for service accounts
+11. Audit log retention (90-day operational + archival)
 
 ---
 
@@ -426,86 +536,21 @@ VERIXORA does NOT include:
 - cloud identity provider dependency
 - external biometric system dependency (optional only)
 - distributed microservices architecture (not in MVP phase)
+- offline unlock capability (explicitly excluded)
 
 ---
 
 # DEVELOPMENT ROADMAP & ITERATION PLAN
 
-The system is delivered in six iterations, each covering backend, mobile app, and web portal phases.  
-All MUST HAVE requirements are complete by the end of Iteration 4.  
-All ADRs are implemented within the iterations listed below.
-
-## ITERATION 0: PROJECT FOUNDATION & SETUP (1-2 weeks)
-
-| Phase          | Backend                                                                                         | Mobile App                         | Web Portal                      |
-| -------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------- |
-| Design         | Modular monolith structure, NuGet packages, ADR review                                          | Ionic project, Capacitor config, theme | Angular workspace, Material theming |
-| Implementation | ApiHost scaffold, module empty projects, SharedKernel, BuildingBlocks, Serilog, OpenTelemetry, **global rate limiting middleware** | Login UI shell, routing            | Login UI shell, routing         |
-| Integration    | Database provisioning (PostgreSQL), EF Core migrations, CI/CD pipeline                         | –                                  | –                               |
-| Testing        | Architecture validation script passes, health check endpoint active                            | –                                  | –                               |
-| Deployment     | CI/CD pipeline (GitHub Actions), /health endpoint                                               | –                                  | –                               |
-
-**Rate Limiting active from start** (ADR-020): global limits 100 req/min per user, 200 per IP.
-
-## ITERATION 1: IDENTITY & HOME MANAGEMENT (2-3 weeks)
-
-| Phase          | Backend                                                                                         | Mobile App                      | Web Portal                        |
-| -------------- | ----------------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------- |
-| Design         | User, Home, Session aggregates, role model                                                     | Registration/login wireframes   | Admin user management wireframes  |
-| Implementation | Identity module (Domain, App, Infra, Presentation), JWT auth, refresh tokens, session fingerprint, column encryption (ADR-017) | Registration, login, OTP, home list | Home CRUD, user/role assignment |
-| Integration    | API v1 endpoints, Swagger, unit/integration tests                                               | Connect to backend              | Connect to backend                |
-| Testing        | Identity use case tests                                                                         | E2E smoke tests                 | E2E smoke tests                   |
-| Deployment     | Deploy to staging, validation script                                                            | Build for test devices          | Build for staging                 |
-
-## ITERATION 2: DEVICE REGISTRATION & PROVISIONING (2-3 weeks)
-
-| Phase          | Backend                                                                                         | Mobile App                   | Web Portal                      |
-| -------------- | ----------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------- |
-| Design         | Device aggregate, provisioning token, MQTT token service (ADR-018), configurable device limit  | Device registration form, BLE flow | Device list, status view     |
-| Implementation | Devices + Provisioning modules, short-lived MQTT tokens, device health                         | BLE provisioning screens, scanner | Device management dashboard  |
-| Integration    | MQTT broker setup, device simulator                                                             | BLE plugin integration       | –                               |
-| Testing        | Provisioning & device limit tests                                                               | Simulated provisioning       | Device CRUD tests               |
-| Deployment     | Update staging                                                                                  | –                            | –                               |
-
-## ITERATION 3: SMART LOCK CONTROL & UNLOCK PIPELINE (3-4 weeks)
-
-| Phase          | Backend                                                                                         | Mobile App                       | Web Portal                |
-| -------------- | ----------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------- |
-| Design         | SmartLock aggregate, unlock pipeline handler, idempotency decorator (ADR-016), authorization caching (ADR-019) | Lock/unlock UI, status indicator | Lock management page      |
-| Implementation | SmartLocks module, command handlers, MQTT publishing, idempotency store, **unlock burst rate limit** | Lock/unlock interactions, SignalR status | Admin override controls |
-| Integration    | MQTT device integration, SignalR hub                                                            | Connect to SignalR               | –                         |
-| Testing        | Full pipeline tests, idempotency, rate limit, SLA measurement                                   | E2E unlock flow                  | –                         |
-| Deployment     | Performance monitoring enabled                                                                  | –                                | –                         |
-
-## ITERATION 4: AUTHORIZATION, AUDIT & SECURITY HARDENING (2-3 weeks)
-
-| Phase          | Backend                                                                                         | Mobile App | Web Portal       |
-| -------------- | ----------------------------------------------------------------------------------------------- | ---------- | ---------------- |
-| Design         | PBAC evaluation engine, audit log schema, firmware signing service (ADR-022)                   | –          | Audit log viewer |
-| Implementation | Authorization module cache invalidation, immutable audit logs, encrypted columns, signed firmware handling | –          | Audit dashboard  |
-| Integration    | Firmware signing validation, email notifications                                               | –          | –                |
-| Testing        | Auth cache, audit immutability, firmware signature                                              | –          | –                |
-| Deployment     | –                                                                                               | –          | –                |
-
-## ITERATION 5: MONITORING, NOTIFICATIONS & AUTOMATION (2-3 weeks)
-
-| Phase          | Backend                                                                                         | Mobile App         | Web Portal               |
-| -------------- | ----------------------------------------------------------------------------------------------- | ------------------ | ------------------------ |
-| Design         | Monitoring aggregations, notification templates, IF-THEN rule engine                           | Notification UI    | Real-time dashboard      |
-| Implementation | Monitoring module, Notifications (email), Automation module (depth limits)                     | Push via SignalR   | Charts, alert management |
-| Integration    | Prometheus, Grafana                                                                            | –                  | –                        |
-| Testing        | Loop detection, notification delivery                                                           | –                  | –                        |
-| Deployment     | –                                                                                               | –                  | –                        |
-
-## ITERATION 6: FACE VERIFICATION & PRODUCTION HARDENING (2-3 weeks)
-
-| Phase          | Backend                                                                                         | Mobile App            | Web Portal          |
-| -------------- | ----------------------------------------------------------------------------------------------- | --------------------- | ------------------- |
-| Design         | Pluggable face provider, embedding encryption, caching                                         | Face capture screen   | Settings page       |
-| Implementation | FaceVerification module, mock/real provider                                                    | Camera integration, face submission | –          |
-| Integration    | Face recognition endpoint, session cache                                                       | –                     | –                   |
-| Testing        | Spoof detection, face match, final pipeline SLA                                                | –                     | –                   |
-| Deployment     | Production release, automated backups (ADR backup), app store submission                       | App store submission  | Production deploy   |
+| Iteration | Focus | Duration |
+|-----------|-------|----------|
+| 0 | Project Foundation & Setup | 1-2 weeks |
+| 1 | Identity & Home Management | 2-3 weeks |
+| 2 | Device Registration & Provisioning | 2-3 weeks |
+| 3 | Smart Lock Control & Unlock Pipeline | 3-4 weeks |
+| 4 | Authorization, Audit & Security Hardening | 2-3 weeks |
+| 5 | Monitoring, Notifications & Automation | 2-3 weeks |
+| 6 | Face Verification & Production Hardening | 2-3 weeks |
 
 ---
 
@@ -515,22 +560,42 @@ All ADRs are implemented within the iterations listed below.
 | ------------------------------- | -------------- |
 | Identity, JWT, sessions         | 1              |
 | Home, roles                     | 1              |
+| API key authentication          | 1              |
 | Devices, provisioning, MQTT tokens | 2           |
+| Device decommissioning          | 2              |
 | Smart lock, pipeline, idempotency, auth cache | 3      |
+| Offline mode exclusion          | 3              |
 | Rate limiting (global)          | 0              |
 | Rate limiting (unlock burst)    | 3              |
 | Authorization (RBAC/PBAC)       | 4              |
 | Audit logs, encryption          | 4              |
+| Audit log retention             | 4              |
 | Signed firmware                 | 4              |
 | Monitoring, notifications       | 5              |
 | Automation                      | 5              |
+| Suspicious activity detection   | 5              |
 | Face verification               | 6              |
 | Observability, health checks    | 0, 5           |
 | API versioning                  | 0              |
 | Backup strategy                 | 6              |
 | Validation script               | 0 (runs every iteration) |
+| Contract tests                  | 0 (runs every iteration) |
+| Environments & secrets          | 0, 6           |
+| Containerization                | 0, 6           |
 
 ---
 
-DOCUMENT VERSION: Final - With Roadmap  
-LAST UPDATED: 2026-06-02
+**DOCUMENT VERSION: Final**
+**LAST UPDATED: 2026-06-03**
+
+---
+
+**VERIXORA MASTER SPECIFICATION UPDATED.**
+
+All 6 improvements integrated:
+- Sessions module merged into Identity
+- Reports module contracts minimum defined
+- API key authentication added
+- Audit log retention policy added
+- Suspicious activity detection added
+- Offline mode strategy documented

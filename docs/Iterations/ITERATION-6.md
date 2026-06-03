@@ -1,10 +1,10 @@
-# VERIXORA ITERATION 6 – FACE VERIFICATION & PRODUCTION HARDENING
+# VERIXORA ITERATION 6 – FACE VERIFICATION & PRODUCTION HARDENING (FINAL VERSION)
 
 ---
 
 ## ITERATION OBJECTIVE
 
-Implement the pluggable face verification system, complete performance tuning, activate automated backups, and prepare the system for production release.
+Implement the pluggable face verification system, complete performance tuning, activate automated backups, configure production environments with secrets management, containerization, alerting, SLA dashboard, load testing, and prepare for production release.
 
 By the end of Iteration 6:
 
@@ -13,8 +13,14 @@ By the end of Iteration 6:
 - Face embeddings stored encrypted at column level.
 - Face verification results cached per session for a short time.
 - Spoof detection capability.
+- Integration event contracts defined for FaceVerification module.
 - Automated daily encrypted database backups with 30-day retention.
-- Final performance SLA validation (200ms p95).
+- Production environment configured with secrets management.
+- Containerization with Docker and Kubernetes manifests.
+- AlertManager rules active and tested.
+- Grafana SLA dashboard deployed.
+- Load testing validates 200ms p95 SLA.
+- Final performance SLA validation.
 - Production deployment of backend, mobile app store submission, web portal go-live.
 - Full validation script passes all checks.
 
@@ -33,8 +39,8 @@ By the end of Iteration 6:
 | Backend Developer | FaceVerification module, backup automation, final tuning |
 | Mobile Developer  | Face capture screen, camera integration, app store prep |
 | Web Developer     | Settings page, final polish                    |
-| DevOps            | Production infrastructure, backup automation, monitoring |
-| QA                | Full system E2E testing, performance testing   |
+| DevOps            | Production infrastructure, secrets, Docker, K8s, alerting, Grafana |
+| QA                | Full system E2E testing, load testing          |
 
 ---
 
@@ -119,19 +125,23 @@ By the end of Iteration 6:
   - `POST /api/v1/face-verification/verify` – verify face against profile.
   - `GET /api/v1/face-verification/history` – get verification history.
 
-### 1.5 Backend – Contracts
+### 1.5 Backend – Contracts (including Integration Events)
 
 **FaceVerification.Contracts:**
 - `Requests/`: `EnrollFaceRequest`, `VerifyFaceRequest`.
 - `Responses/`: `FaceProfileResponse`, `FaceVerificationResponse`, `VerificationHistoryResponse`.
+- `IntegrationEvents/`:
+  - `FaceVerificationPassedIntegrationEvent`
+  - `FaceVerificationFailedIntegrationEvent`
+  - `SpoofDetectedIntegrationEvent`
 
 ### 1.6 Production Hardening
 
 **Backup Automation:**
-- Scheduled job (Quartz.NET or similar) for daily database backups.
+- Scheduled job (Quartz.NET) for daily database backups.
 - Backups encrypted with AES-256.
 - Stored off-site (Azure Blob / AWS S3) with 30-day retention.
-- Backup success/failure alerts.
+- Backup success/failure alerts via AlertManager.
 
 **Performance Tuning:**
 - Database query optimization (indexes, query plans).
@@ -144,6 +154,7 @@ By the end of Iteration 6:
 - JWT signing key rotation policy.
 - MQTT broker security review.
 - API penetration testing preparation.
+- Secrets verified in production environment.
 
 **Production Infrastructure:**
 - Production PostgreSQL instance (managed service).
@@ -151,7 +162,14 @@ By the end of Iteration 6:
 - Load balancer configuration.
 - SSL/TLS certificates.
 - DNS configuration.
-- Monitoring and alerting (Prometheus + Grafana + AlertManager).
+- Secrets manager (Azure Key Vault / AWS Secrets Manager).
+- Docker image built and pushed to container registry.
+- Kubernetes manifests for production deployment.
+
+**Load Testing:**
+- k6 or NBomber test scripts for concurrent unlock requests.
+- Validates 200ms p95 SLA under load.
+- Tests rate limiting behavior under load.
 
 ### 1.7 Mobile App
 
@@ -173,6 +191,7 @@ By the end of Iteration 6:
 ### 2.1 FaceVerification.Domain (New Files)
 ```
 FaceVerification.Domain/
++-- (existing files from Iteration 0)
 +-- Entities/
 |   +-- FaceProfile.cs
 |   +-- FaceVerificationAttempt.cs
@@ -196,6 +215,7 @@ FaceVerification.Domain/
 ### 2.2 FaceVerification.Application (New Files)
 ```
 FaceVerification.Application/
++-- (existing files from Iteration 0)
 +-- Commands/
 |   +-- EnrollFace/
 |   |   +-- EnrollFaceCommand.cs
@@ -231,6 +251,7 @@ FaceVerification.Application/
 ### 2.3 FaceVerification.Infrastructure (New Files)
 ```
 FaceVerification.Infrastructure/
++-- (existing files from Iteration 0)
 +-- Persistence/
 |   +-- FaceVerificationDbContext.cs
 |   +-- Configurations/
@@ -256,6 +277,7 @@ FaceVerification.Infrastructure/
 ### 2.4 FaceVerification.Presentation (New Files)
 ```
 FaceVerification.Presentation/
++-- (existing files from Iteration 0)
 +-- Controllers/
     +-- FaceProfileController.cs
     +-- FaceVerificationController.cs
@@ -264,13 +286,18 @@ FaceVerification.Presentation/
 ### 2.5 FaceVerification.Contracts (New Files)
 ```
 FaceVerification.Contracts/
++-- (existing files from Iteration 0)
 +-- Requests/
 |   +-- EnrollFaceRequest.cs
 |   +-- VerifyFaceRequest.cs
 +-- Responses/
-    +-- FaceProfileResponse.cs
-    +-- FaceVerificationResponse.cs
-    +-- VerificationHistoryResponse.cs
+|   +-- FaceProfileResponse.cs
+|   +-- FaceVerificationResponse.cs
+|   +-- VerificationHistoryResponse.cs
++-- IntegrationEvents/
+    +-- FaceVerificationPassedIntegrationEvent.cs
+    +-- FaceVerificationFailedIntegrationEvent.cs
+    +-- SpoofDetectedIntegrationEvent.cs
 ```
 
 ### 2.6 BuildingBlocks Updates
@@ -278,6 +305,7 @@ FaceVerification.Contracts/
 **Backup Infrastructure:**
 ```
 BuildingBlocks.Infrastructure/
++-- (existing files from Iteration 0)
 +-- Backup/
     +-- BackupService.cs
     +-- BackupConfiguration.cs
@@ -291,8 +319,41 @@ ApiHost/
 |   +-- Register backup job scheduler
 |   +-- Configure CORS for production domains
 |   +-- Configure production middleware
-+-- appsettings.Production.json
++-- appsettings.Production.json (updated, no secrets)
 ```
+
+### 2.8 Infrastructure (New Files)
+```
+infrastructure/
++-- kubernetes/
+|   +-- namespace.yaml
+|   +-- deployment.yaml
+|   +-- service.yaml
+|   +-- ingress.yaml
+|   +-- configmap.yaml
+|   +-- secrets-provider.yaml
++-- docker/
+|   +-- Dockerfile (updated for production)
+|   +-- .dockerignore
++-- load-tests/
+    +-- k6/
+        +-- unlock-pipeline-load.js
+        +-- rate-limiting-load.js
+```
+
+### 2.9 Incident Response Runbook (New Document)
+```
+docs/
++-- incident-response-runbook.md
+```
+
+Contents:
+- Force-lock all doors procedure.
+- Revoke all sessions procedure.
+- Rotate signing keys procedure.
+- Isolate compromised device procedure.
+- Notify affected users procedure.
+- Escalation contacts.
 
 ---
 
@@ -307,6 +368,11 @@ ApiHost/
 - Production infrastructure provisioned.
 - SSL certificates installed.
 - DNS configured.
+- Secrets manager configured and verified.
+- Docker image built and pushed to container registry.
+- Kubernetes manifests applied to production cluster.
+- AlertManager connected to production.
+- Grafana dashboards imported to production.
 
 ---
 
@@ -333,14 +399,23 @@ ApiHost/
 - `FaceEmbedding_EncryptedInDatabase`
 - `BackupJob_ShouldCreateEncryptedBackup`
 - `BackupJob_ShouldUploadToOffSite`
+- `Production_Secrets_ShouldNotBeInConfigFiles`
+- `Kubernetes_Deployment_ShouldBeHealthy`
 
-### 4.4 Performance Tests
-- `UnlockPipeline_WithFaceVerification_ShouldMeetSLA`
+### 4.4 Contract Tests
+- `FaceVerification_Contracts_ShouldMatchPublishedEvents`
+
+### 4.5 Load Tests
+- `UnlockPipeline_Concurrent100_ShouldMeetSLA`
+- `UnlockPipeline_Concurrent500_ShouldMeetSLA`
+- `UnlockPipeline_SustainedLoad_ShouldNotDegrade`
+- `RateLimiting_UnderLoad_ShouldProtectSystem`
 - `FaceVerification_UnderLoad_ShouldScale`
 
-### 4.5 E2E Tests
+### 4.6 E2E Tests
 - Enroll face → request unlock → face verified → door unlocks.
 - Spoof attempt → face verification fails → unlock denied.
+- Backup job runs → backup stored off-site → alert on success.
 
 ---
 
@@ -348,11 +423,14 @@ ApiHost/
 
 - Provision production infrastructure.
 - Run all database migrations against production.
-- Deploy backend to production.
+- Configure secrets manager with production secrets.
+- Deploy backend to production (Docker/Kubernetes).
 - Deploy MQTT broker to production.
 - Configure DNS and SSL.
 - Enable automated backups.
-- Deploy Prometheus, Grafana, AlertManager.
+- Deploy Prometheus, Grafana, AlertManager to production.
+- Import SLA dashboard.
+- Run load tests against production.
 - Submit mobile app to App Store and Google Play.
 - Deploy web portal to production CDN.
 - Run final validation script against production.
@@ -369,15 +447,23 @@ ApiHost/
 - [ ] Face embeddings encrypted at column level.
 - [ ] Face verification cached per session.
 - [ ] Face verification runs last in unlock pipeline (step 10).
+- [ ] Integration event contracts defined.
+- [ ] Contract tests pass.
 - [ ] Automated daily backups running.
 - [ ] Backups encrypted and stored off-site.
 - [ ] 30-day backup retention configured.
-- [ ] Final unlock pipeline meets 200ms p95 SLA.
 - [ ] Production environment fully operational.
+- [ ] Secrets managed externally, not in files.
+- [ ] Docker image in container registry.
+- [ ] Kubernetes deployment healthy.
+- [ ] AlertManager rules active.
+- [ ] Grafana SLA dashboard deployed.
+- [ ] Load tests pass (200ms p95 SLA).
+- [ ] Incident response runbook documented.
 - [ ] Mobile app submitted to app stores.
 - [ ] Web portal deployed to production.
-- [ ] All tests pass including performance SLA.
-- [ ] Validation script passes all checks.
+- [ ] All tests pass including load tests.
+- [ ] Validation script passes all 23 checks.
 
 ---
 
@@ -392,40 +478,41 @@ ApiHost/
 | Spoof detection                    | ISpoofDetectionProvider                 |
 | Backup strategy (SHOULD)           | Automated daily encrypted backups       |
 | Backup retention (30 days)         | Off-site storage with retention policy  |
-| Performance SLA (200ms p95)        | Final validation and tuning             |
+| Performance SLA (200ms p95)        | Load testing validation                 |
 | Production deployment              | Full production infrastructure          |
+| Secrets management                 | Azure Key Vault / AWS Secrets Manager   |
+| Containerization                   | Docker + Kubernetes manifests           |
+| Alerting rules                     | AlertManager deployed                   |
+| SLA dashboard                      | Grafana dashboards deployed             |
+| Load testing                       | k6 scripts, SLA validation              |
+| Incident response                  | runbook documented                      |
 | App store submission               | iOS and Android                         |
+| Integration event contracts        | FaceVerification.Contracts              |
 
 ---
 
-## NEW FILE INVENTORY
+**ITERATION 6 COMPLETE.**
 
-| Module | Domain | Application | Infrastructure | Presentation | Contracts |
-|--------|--------|-------------|----------------|--------------|------------|
-| FaceVerification | 12 | 20 | 14 | 2 | 5 |
-| BuildingBlocks (backup) | 0 | 0 | 3 | 0 | 0 |
-| ApiHost (updates) | 0 | 0 | 0 | 2 | 0 |
-| **Total New** | **12** | **20** | **17** | **4** | **5** |
-
-**Grand Total New Files: 58**
+All improvements integrated:
+- Integration event contracts (FaceVerification)
+- Load testing strategy
+- Environment configuration (production)
+- Secrets management (production)
+- Containerization (Kubernetes manifests)
+- Alerting rules (deployed)
+- SLA dashboard (deployed)
+- Incident response runbook
 
 ---
 
 ## ALL ITERATIONS SUMMARY
 
-| Iteration | Focus | New Files |
-|-----------|-------|-----------|
-| Iteration 0 | Foundation & Setup | 71 projects |
-| Iteration 1 | Identity & Home | 87 |
-| Iteration 2 | Devices & Provisioning | 80 |
-| Iteration 3 | Smart Locks & Pipeline | 74 |
-| Iteration 4 | Authorization & Audit | 154 |
-| Iteration 5 | Monitoring & Automation | 140 |
-| Iteration 6 | Face Verify & Production | 58 |
-| **Total** | | **593 files + 71 projects** |
-
----
-
-**ITERATION 6 DOCUMENT COMPLETE**
-
-**ALL 7 ITERATION DOCUMENTS NOW COMPLETE**
+| Iteration | Focus | Key Improvements |
+|-----------|-------|-----------------|
+| 0 | Foundation & Setup | 10 improvements |
+| 1 | Identity & Home | API keys, Sessions merged, Integration events |
+| 2 | Devices & Provisioning | Decommissioning, Simulator, Integration events |
+| 3 | Smart Locks & Pipeline | API key bypass, No cache, No offline, Integration events |
+| 4 | Authorization & Audit | Retention policy, API key audit, Integration events |
+| 5 | Monitoring & Automation | Suspicious activity, Alerting rules, SLA dashboard, Integration events |
+| 6 | Face Verify & Production | Load tests, Secrets, K8s, Incident runbook, Integration events |

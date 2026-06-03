@@ -1,19 +1,21 @@
-# VERIXORA ITERATION 4 – AUTHORIZATION, AUDIT & SECURITY HARDENING
+# VERIXORA ITERATION 4 – AUTHORIZATION, AUDIT & SECURITY HARDENING (FINAL VERSION)
 
 ---
 
 ## ITERATION OBJECTIVE
 
-Implement RBAC/PBAC enforcement engine, immutable encrypted audit logs, signed firmware update handling, and complete the security hardening of the system.
+Implement RBAC/PBAC enforcement engine, immutable encrypted audit logs with retention policy, signed firmware update handling, integration event contracts, and complete the security hardening of the system.
 
 By the end of Iteration 4:
 
 - Full RBAC and PBAC policy evaluation engine.
 - DENY always overrides ALLOW.
 - Immutable, append-only audit logs encrypted at column level.
+- Audit log retention: 90 days operational, 7 years archived.
 - All security-sensitive actions generate audit entries.
 - Firmware update binaries are digitally signed and verified.
 - Authorization cache invalidation on role/permission changes.
+- Integration event contracts defined for Authorization and AuditLogs modules.
 - Web Portal shows audit log viewer.
 
 ---
@@ -29,7 +31,7 @@ By the end of Iteration 4:
 | Role              | Focus                                          |
 | ----------------- | ---------------------------------------------- |
 | Backend Developer | Authorization module, AuditLogs module, Security module |
-| Mobile Developer  | No major changes (minor audit visibility if needed) |
+| Mobile Developer  | No major changes                               |
 | Web Developer     | Audit log viewer, dashboard                    |
 | IoT Developer     | ESP32 firmware signature verification          |
 
@@ -86,6 +88,7 @@ By the end of Iteration 4:
   - `Id` (Guid)
   - `HomeId` (Guid)
   - `UserId` (Guid?)
+  - `ApiKeyId` (Guid?)
   - `DeviceId` (Guid?)
   - `Action` (string)
   - `Resource` (string)
@@ -94,6 +97,7 @@ By the end of Iteration 4:
   - `IpAddress` (string)
   - `UserAgent` (string)
   - `Timestamp` (DateTimeOffset)
+  - `ArchivedAt` (DateTimeOffset?)
 - `AuditLogEntry` value object (for batch operations):
   - `Action` (string)
   - `Timestamp` (DateTimeOffset)
@@ -126,6 +130,7 @@ By the end of Iteration 4:
 - `AccessEvaluated`
 - `AccessDenied`
 - `AuditLogCreated`
+- `AuditLogArchived`
 - `FirmwarePackageSigned`
 - `FirmwareUpdateInitiated`
 - `FirmwareUpdateCompleted`
@@ -156,19 +161,17 @@ By the end of Iteration 4:
 - `GetDeviceAccessQuery` → `GetDeviceAccessHandler`
 - `GetUserPermissionsQuery` → `GetUserPermissionsHandler`
 
-**Authorization.Application – Services:**
-- `IAccessEvaluationEngine` (implemented in Infrastructure)
-- `IAuthorizationCacheService` – manages the 1-minute cache.
-
 **AuditLogs.Application – Commands:**
 - `CreateAuditLogCommand` → `CreateAuditLogHandler`
 - `BatchCreateAuditLogCommand` → `BatchCreateAuditLogHandler`
+- `ArchiveAuditLogsCommand` → `ArchiveAuditLogsHandler`
 
 **AuditLogs.Application – Queries:**
 - `GetAuditLogsByHomeQuery` → `GetAuditLogsByHomeHandler`
 - `GetAuditLogsByUserQuery` → `GetAuditLogsByUserHandler`
 - `GetAuditLogsByDeviceQuery` → `GetAuditLogsByDeviceHandler`
 - `GetAuditLogsByDateRangeQuery` → `GetAuditLogsByDateRangeHandler`
+- `GetArchivedAuditLogsQuery` → `GetArchivedAuditLogsHandler`
 
 **Security.Application – Commands:**
 - `CreateFirmwarePackageCommand` → `CreateFirmwarePackageHandler`
@@ -194,6 +197,7 @@ By the end of Iteration 4:
 - `AuditLogsDbContext` with `DbSet<AuditLog>`.
 - `AuditLogConfiguration` – configures encrypted metadata column.
 - `AuditLogRepository` – append-only, no update/delete methods.
+- `AuditLogRetentionJob` – archives logs older than 90 days.
 - `EncryptionConverter` for metadata column.
 
 **Security.Infrastructure:**
@@ -232,6 +236,7 @@ By the end of Iteration 4:
   - `GET /api/v1/audit-logs/user/{userId}`
   - `GET /api/v1/audit-logs/device/{deviceId}`
   - `GET /api/v1/audit-logs/date-range`
+  - `GET /api/v1/audit-logs/archived`
 
 **Security.Presentation – Controllers:**
 - `FirmwareController`:
@@ -242,23 +247,34 @@ By the end of Iteration 4:
   - `GET /api/v1/firmware/updates/{id}`
   - `POST /api/v1/firmware/updates/{id}/verify`
 
-### 1.5 Backend – Contracts
+### 1.5 Backend – Contracts (including Integration Events)
 
 **Authorization.Contracts:**
 - `Requests/`: `CreateRoleRequest`, `UpdateRoleRequest`, `AssignPermissionRequest`, `CreatePolicyRequest`, `UpdatePolicyRequest`, `SetDeviceAccessRequest`, `EvaluateAccessRequest`.
 - `Responses/`: `RoleResponse`, `PolicyResponse`, `DeviceAccessResponse`, `AccessEvaluationResponse`, `PermissionResponse`.
+- `IntegrationEvents/`:
+  - `RolePermissionChangedIntegrationEvent`
+  - `AccessEvaluatedIntegrationEvent`
+  - `AccessDeniedIntegrationEvent`
 
 **AuditLogs.Contracts:**
 - `Requests/`: `AuditLogFilterRequest`.
-- `Responses/`: `AuditLogResponse`, `AuditLogBatchResponse`.
+- `Responses/`: `AuditLogResponse`, `AuditLogBatchResponse`, `ArchivedAuditLogResponse`.
+- `IntegrationEvents/`:
+  - `AuditLogCreatedIntegrationEvent`
+  - `AuditLogArchivedIntegrationEvent`
 
 **Security.Contracts:**
 - `Requests/`: `CreateFirmwarePackageRequest`, `SignFirmwareRequest`, `InitiateFirmwareUpdateRequest`, `VerifyFirmwareRequest`.
 - `Responses/`: `FirmwarePackageResponse`, `FirmwareUpdateStatusResponse`, `FirmwareVerificationResponse`.
+- `IntegrationEvents/`:
+  - `FirmwarePackageSignedIntegrationEvent`
+  - `FirmwareUpdateCompletedIntegrationEvent`
 
 ### 1.6 Web Portal
 
-- **Audit Log Viewer:** filterable table by user, device, date range, action, result.
+- **Audit Log Viewer:** filterable table by user, device, API key, date range, action, result.
+- **Archived Logs Viewer:** search and view archived audit logs.
 - **Role Management Page:** CRUD roles, assign permissions.
 - **Policy Management Page:** CRUD policies, set priorities.
 - **Device Access Page:** per-user per-device access settings.
@@ -271,6 +287,7 @@ By the end of Iteration 4:
 ### 2.1 Authorization.Domain (New Files)
 ```
 Authorization.Domain/
++-- (existing files from Iteration 0)
 +-- Entities/
 |   +-- Role.cs
 |   +-- Permission.cs
@@ -297,6 +314,7 @@ Authorization.Domain/
 ### 2.2 Authorization.Application (New Files)
 ```
 Authorization.Application/
++-- (existing files from Iteration 0)
 +-- Commands/
 |   +-- CreateRole/
 |   |   +-- CreateRoleCommand.cs
@@ -362,6 +380,7 @@ Authorization.Application/
 ### 2.3 Authorization.Infrastructure (New Files)
 ```
 Authorization.Infrastructure/
++-- (existing files from Iteration 0)
 +-- Persistence/
 |   +-- AuthorizationDbContext.cs (updated)
 |   +-- Configurations/
@@ -371,10 +390,10 @@ Authorization.Infrastructure/
 |   |   +-- PolicyConfiguration.cs
 |   |   +-- DeviceAccessConfiguration.cs
 |   +-- Repositories/
-|   |   +-- RoleRepository.cs
-|   |   +-- PolicyRepository.cs
-|   |   +-- DeviceAccessRepository.cs
-|   |   +-- PermissionRepository.cs
+|       +-- RoleRepository.cs
+|       +-- PolicyRepository.cs
+|       +-- DeviceAccessRepository.cs
+|       +-- PermissionRepository.cs
 +-- Services/
 |   +-- AccessEvaluationEngine.cs
 |   +-- AuthorizationCacheService.cs
@@ -385,6 +404,7 @@ Authorization.Infrastructure/
 ### 2.4 Authorization.Presentation (New Files)
 ```
 Authorization.Presentation/
++-- (existing files from Iteration 0)
 +-- Controllers/
     +-- RoleController.cs
     +-- PolicyController.cs
@@ -394,6 +414,7 @@ Authorization.Presentation/
 ### 2.5 Authorization.Contracts (New Files)
 ```
 Authorization.Contracts/
++-- (existing files from Iteration 0)
 +-- Requests/
 |   +-- CreateRoleRequest.cs
 |   +-- UpdateRoleRequest.cs
@@ -403,16 +424,21 @@ Authorization.Contracts/
 |   +-- SetDeviceAccessRequest.cs
 |   +-- EvaluateAccessRequest.cs
 +-- Responses/
-    +-- RoleResponse.cs
-    +-- PolicyResponse.cs
-    +-- DeviceAccessResponse.cs
-    +-- AccessEvaluationResponse.cs
-    +-- PermissionResponse.cs
+|   +-- RoleResponse.cs
+|   +-- PolicyResponse.cs
+|   +-- DeviceAccessResponse.cs
+|   +-- AccessEvaluationResponse.cs
+|   +-- PermissionResponse.cs
++-- IntegrationEvents/
+    +-- RolePermissionChangedIntegrationEvent.cs
+    +-- AccessEvaluatedIntegrationEvent.cs
+    +-- AccessDeniedIntegrationEvent.cs
 ```
 
 ### 2.6 AuditLogs.Domain (New Files)
 ```
 AuditLogs.Domain/
++-- (existing files from Iteration 0)
 +-- Entities/
 |   +-- AuditLog.cs
 +-- Enums/
@@ -421,6 +447,7 @@ AuditLogs.Domain/
 |   +-- AuditLogEntry.cs
 +-- Events/
 |   +-- AuditLogCreated.cs
+|   +-- AuditLogArchived.cs
 +-- Services/
     +-- IAuditService.cs
 ```
@@ -428,13 +455,17 @@ AuditLogs.Domain/
 ### 2.7 AuditLogs.Application (New Files)
 ```
 AuditLogs.Application/
++-- (existing files from Iteration 0)
 +-- Commands/
 |   +-- CreateAuditLog/
 |   |   +-- CreateAuditLogCommand.cs
 |   |   +-- CreateAuditLogHandler.cs
 |   +-- BatchCreateAuditLog/
-|       +-- BatchCreateAuditLogCommand.cs
-|       +-- BatchCreateAuditLogHandler.cs
+|   |   +-- BatchCreateAuditLogCommand.cs
+|   |   +-- BatchCreateAuditLogHandler.cs
+|   +-- ArchiveAuditLogs/
+|       +-- ArchiveAuditLogsCommand.cs
+|       +-- ArchiveAuditLogsHandler.cs
 +-- Queries/
 |   +-- GetAuditLogsByHome/
 |   |   +-- GetAuditLogsByHomeQuery.cs
@@ -446,11 +477,15 @@ AuditLogs.Application/
 |   |   +-- GetAuditLogsByDeviceQuery.cs
 |   |   +-- GetAuditLogsByDeviceHandler.cs
 |   +-- GetAuditLogsByDateRange/
-|       +-- GetAuditLogsByDateRangeQuery.cs
-|       +-- GetAuditLogsByDateRangeHandler.cs
+|   |   +-- GetAuditLogsByDateRangeQuery.cs
+|   |   +-- GetAuditLogsByDateRangeHandler.cs
+|   +-- GetArchivedAuditLogs/
+|       +-- GetArchivedAuditLogsQuery.cs
+|       +-- GetArchivedAuditLogsHandler.cs
 +-- DTOs/
 |   +-- AuditLogDto.cs
 |   +-- AuditLogFilterDto.cs
+|   +-- ArchivedAuditLogDto.cs
 +-- Interfaces/
     +-- IAuditLogRepository.cs
 ```
@@ -458,6 +493,7 @@ AuditLogs.Application/
 ### 2.8 AuditLogs.Infrastructure (New Files)
 ```
 AuditLogs.Infrastructure/
++-- (existing files from Iteration 0)
 +-- Persistence/
 |   +-- AuditLogsDbContext.cs (updated)
 |   +-- Configurations/
@@ -468,6 +504,7 @@ AuditLogs.Infrastructure/
 |       +-- EncryptionConverter.cs
 +-- Services/
 |   +-- AuditService.cs
+|   +-- AuditLogRetentionJob.cs
 +-- Migrations/
     +-- (EF Core generated)
 ```
@@ -475,6 +512,7 @@ AuditLogs.Infrastructure/
 ### 2.9 AuditLogs.Presentation (New Files)
 ```
 AuditLogs.Presentation/
++-- (existing files from Iteration 0)
 +-- Controllers/
     +-- AuditLogController.cs
 ```
@@ -482,16 +520,22 @@ AuditLogs.Presentation/
 ### 2.10 AuditLogs.Contracts (New Files)
 ```
 AuditLogs.Contracts/
++-- (existing files from Iteration 0)
 +-- Requests/
 |   +-- AuditLogFilterRequest.cs
 +-- Responses/
-    +-- AuditLogResponse.cs
-    +-- AuditLogBatchResponse.cs
+|   +-- AuditLogResponse.cs
+|   +-- AuditLogBatchResponse.cs
+|   +-- ArchivedAuditLogResponse.cs
++-- IntegrationEvents/
+    +-- AuditLogCreatedIntegrationEvent.cs
+    +-- AuditLogArchivedIntegrationEvent.cs
 ```
 
 ### 2.11 Security.Domain (New Files)
 ```
 Security.Domain/
++-- (existing files from Iteration 0)
 +-- Entities/
 |   +-- FirmwarePackage.cs
 |   +-- FirmwareUpdateRecord.cs
@@ -510,6 +554,7 @@ Security.Domain/
 ### 2.12 Security.Application (New Files)
 ```
 Security.Application/
++-- (existing files from Iteration 0)
 +-- Commands/
 |   +-- CreateFirmwarePackage/
 |   |   +-- CreateFirmwarePackageCommand.cs
@@ -545,14 +590,15 @@ Security.Application/
 ### 2.13 Security.Infrastructure (New Files)
 ```
 Security.Infrastructure/
++-- (existing files from Iteration 0)
 +-- Persistence/
 |   +-- SecurityDbContext.cs (updated)
 |   +-- Configurations/
 |   |   +-- FirmwarePackageConfiguration.cs
 |   |   +-- FirmwareUpdateRecordConfiguration.cs
 |   +-- Repositories/
-|   |   +-- FirmwarePackageRepository.cs
-|   |   +-- FirmwareUpdateRepository.cs
+|       +-- FirmwarePackageRepository.cs
+|       +-- FirmwareUpdateRepository.cs
 +-- Services/
 |   +-- FirmwareSigningService.cs
 |   +-- FirmwareVerificationService.cs
@@ -563,6 +609,7 @@ Security.Infrastructure/
 ### 2.14 Security.Presentation (New Files)
 ```
 Security.Presentation/
++-- (existing files from Iteration 0)
 +-- Controllers/
     +-- FirmwareController.cs
 ```
@@ -570,15 +617,19 @@ Security.Presentation/
 ### 2.15 Security.Contracts (New Files)
 ```
 Security.Contracts/
++-- (existing files from Iteration 0)
 +-- Requests/
 |   +-- CreateFirmwarePackageRequest.cs
 |   +-- SignFirmwareRequest.cs
 |   +-- InitiateFirmwareUpdateRequest.cs
 |   +-- VerifyFirmwareRequest.cs
 +-- Responses/
-    +-- FirmwarePackageResponse.cs
-    +-- FirmwareUpdateStatusResponse.cs
-    +-- FirmwareVerificationResponse.cs
+|   +-- FirmwarePackageResponse.cs
+|   +-- FirmwareUpdateStatusResponse.cs
+|   +-- FirmwareVerificationResponse.cs
++-- IntegrationEvents/
+    +-- FirmwarePackageSignedIntegrationEvent.cs
+    +-- FirmwareUpdateCompletedIntegrationEvent.cs
 ```
 
 ---
@@ -589,8 +640,9 @@ Security.Contracts/
 - Run EF Core migrations for all three schemas.
 - Connect audit logging to all existing modules (Identity, Devices, SmartLocks).
 - Authorization cache invalidation wired to `RolePermissionChanged` events.
+- AuditLogRetentionJob registered as background service.
 - Firmware signing integrated with device update flow.
-- CI pipeline runs all new tests.
+- CI pipeline runs all new tests including contract tests.
 
 ---
 
@@ -600,6 +652,7 @@ Security.Contracts/
 - `Policy_Deny_ShouldOverrideAllow`
 - `Role_AddPermission_ShouldRaiseEvent`
 - `AuditLog_ShouldBeImmutable`
+- `AuditLog_ShouldSupportArchival`
 - `FirmwarePackage_Sign_ShouldSetSignature`
 
 ### 4.2 Application Tests
@@ -613,6 +666,8 @@ Security.Contracts/
 - `AuditLog_Create_ShouldPersist`
 - `AuditLog_ShouldBeImmutable_NoUpdate`
 - `AuditLog_EncryptedData_ShouldBeUnreadableDirectly`
+- `AuditLogRetention_ShouldArchiveOlderThan90Days`
+- `AuditLogRetention_ShouldNotArchiveRecentLogs`
 - `FirmwareUpdate_UnsignedBinary_ShouldReject`
 - `FirmwareUpdate_SignedBinary_ShouldVerify`
 - `FirmwareUpdate_SignatureMismatch_ShouldFail`
@@ -621,8 +676,15 @@ Security.Contracts/
 - `RoleController_CRUD_ShouldWork`
 - `PolicyController_CRUD_ShouldWork`
 - `AuditLogController_Filter_ShouldReturnResults`
+- `AuditLogController_Archived_ShouldReturnResults`
 - `AuditLog_Encryption_ShouldBeTransparent`
 - `FirmwareController_Sign_ShouldSucceed`
+- `AuditLogRetentionJob_ShouldExecute`
+
+### 4.4 Contract Tests
+- `Authorization_Contracts_ShouldMatchPublishedEvents`
+- `AuditLogs_Contracts_ShouldMatchPublishedEvents`
+- `Security_Contracts_ShouldMatchPublishedEvents`
 
 ---
 
@@ -631,6 +693,7 @@ Security.Contracts/
 - Deploy updated backend to staging.
 - Run all migrations.
 - Verify audit logs from previous iterations are captured.
+- Configure cold storage for audit log archival.
 - Build web portal with audit log viewer.
 - Run full validation script.
 
@@ -643,11 +706,15 @@ Security.Contracts/
 - [ ] Authorization cache invalidates on role/permission change.
 - [ ] Audit logs are immutable and append-only.
 - [ ] Audit logs encrypted at column level.
+- [ ] Audit log retention: 90 days operational, 7 years archived.
 - [ ] All security-sensitive actions generate audit entries.
+- [ ] API key usage tracked in audit logs.
 - [ ] Firmware packages can be uploaded and signed.
 - [ ] Firmware signature verification works.
 - [ ] Unsigned firmware updates are rejected.
-- [ ] Web portal shows audit log viewer.
+- [ ] Integration event contracts defined.
+- [ ] Contract tests pass.
+- [ ] Web portal shows audit log viewer with archived logs.
 - [ ] All tests pass.
 
 ---
@@ -660,23 +727,17 @@ Security.Contracts/
 | DENY priority (ADR-012)            | Strict evaluation order                 |
 | Immutable audit logs (ADR-010)     | Append-only repository                  |
 | Audit encryption (ADR-017)         | Column-level encrypted metadata         |
+| Audit retention (ADR-025)          | 90-day operational, 7-year archive      |
 | Signed firmware (ADR-022)          | FirmwareSigningService                  |
 | Authorization caching invalidation | RolePermissionChanged event             |
-| Audit all security actions         | Integrated across all modules           |
+| API key audit tracking             | ApiKeyId field in AuditLog              |
+| Integration event contracts        | Authorization + AuditLogs + Security    |
 
 ---
 
-## NEW FILE INVENTORY
+**ITERATION 4 COMPLETE.**
 
-| Module | Domain | Application | Infrastructure | Presentation | Contracts |
-|--------|--------|-------------|----------------|--------------|------------|
-| Authorization | 16 | 32 | 15 | 3 | 12 |
-| AuditLogs | 6 | 14 | 8 | 1 | 3 |
-| Security | 9 | 17 | 10 | 1 | 7 |
-| **Total New** | **31** | **63** | **33** | **5** | **22** |
-
-**Grand Total New Files: 154**
-
----
-
-**ITERATION 4 DOCUMENT COMPLETE**
+All improvements integrated:
+- Integration event contracts (Authorization, AuditLogs, Security)
+- Audit log retention policy (90 days + 7 year archive)
+- API key tracking in audit logs
