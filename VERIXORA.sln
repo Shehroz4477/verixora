@@ -48,9 +48,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Directory.Build.props = Directory.Build.props
 		Directory.Packages.props = Directory.Packages.props
 		docker-compose.yml = docker-compose.yml
-		Dockerfile.txt = Dockerfile.txt
+		Dockerfile = Dockerfile
 		global.json = global.json
-		LICENSE.txt = LICENSE.txt
+		LICENSE = LICENSE
 		nuget.config = nuget.config
 		README.md = README.md
 	EndProjectSection
@@ -65,14 +65,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Project Tree", "Project Tre
 		docs\Project Tree\VERIXORA BACKEND – COMPLETE FILE HIERARCHY (PART 6 OF 6).md = docs\Project Tree\VERIXORA BACKEND – COMPLETE FILE HIERARCHY (PART 6 OF 6).md
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{28791EB1-67F0-48D2-8119-4F6EC21BA829}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SharedKernel", "SharedKernel", "{C2D0CBE4-1922-4C66-8AB9-45BD9AA3AA42}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel.Domain", "src\SharedKernel\SharedKernel.Domain\SharedKernel.Domain.csproj", "{FFB89A35-9AB7-4867-807F-80C7823FBD1A}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel.Application", "src\SharedKernel\SharedKernel.Application\SharedKernel.Application.csproj", "{9827893E-290E-4420-BB66-9178AA830CBF}"
-EndProject
 Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -84,42 +76,5 @@ Global
 		{BE1BD6E6-EE14-4E72-A4E7-0CFBC183B7DA} = {6F0C7A7D-97FD-484C-ADD0-252E8188E616}
 		{725A80B1-78B6-4B9E-898D-9F13E787852D} = {6F0C7A7D-97FD-484C-ADD0-252E8188E616}
 		{25C4B4A5-D25B-489C-99D1-F7E60E82496F} = {6F0C7A7D-97FD-484C-ADD0-252E8188E616}
-		{C2D0CBE4-1922-4C66-8AB9-45BD9AA3AA42} = {28791EB1-67F0-48D2-8119-4F6EC21BA829}
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A} = {C2D0CBE4-1922-4C66-8AB9-45BD9AA3AA42}
-		{9827893E-290E-4420-BB66-9178AA830CBF} = {C2D0CBE4-1922-4C66-8AB9-45BD9AA3AA42}
-	EndGlobalSection
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Debug|x64 = Debug|x64
-		Debug|x86 = Debug|x86
-		Release|Any CPU = Release|Any CPU
-		Release|x64 = Release|x64
-		Release|x86 = Release|x86
-	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Debug|x64.Build.0 = Debug|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Debug|x86.Build.0 = Debug|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Release|x64.ActiveCfg = Release|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Release|x64.Build.0 = Release|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Release|x86.ActiveCfg = Release|Any CPU
-		{FFB89A35-9AB7-4867-807F-80C7823FBD1A}.Release|x86.Build.0 = Release|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Debug|x64.Build.0 = Debug|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Debug|x86.Build.0 = Debug|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Release|x64.ActiveCfg = Release|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Release|x64.Build.0 = Release|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Release|x86.ActiveCfg = Release|Any CPU
-		{9827893E-290E-4420-BB66-9178AA830CBF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
