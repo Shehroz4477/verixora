@@ -64,7 +64,7 @@ public abstract class ValueObject
     /// Use the <see cref="ToAtomicArray"/> helper to create a
     /// shallow defensive copy.
     /// Example:
-    ///   protected override IReadOnlyList<object> GetAtomicValues()
+    ///   protected override IReadOnlyList&lt;object&gt; GetAtomicValues()
     ///       => ToAtomicArray(Amount, Currency);
     /// </summary>
     protected abstract IReadOnlyList<object> GetAtomicValues();
