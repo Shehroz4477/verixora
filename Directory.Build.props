@@ -1,0 +1,19 @@
+<!-- ============================================================
+     Central MSBuild properties for ALL projects.
+     - Enables nullable reference types globally (C# 8+ safety).
+     - Treats warnings as errors for strict quality.
+     - Implicit usings reduce boilerplate.
+     - Sets analysis level to latest (C# 12).
+     ============================================================ -->
+<Project>
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <AnalysisLevel>latest</AnalysisLevel>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
+        <!-- Missing XML comment suppression for now -->
+    </PropertyGroup>
+</Project>
