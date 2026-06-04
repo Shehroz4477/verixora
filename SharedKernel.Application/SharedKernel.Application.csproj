@@ -1,0 +1,52 @@
+<!-- ============================================================
+     VERIXORA – SharedKernel.Application.csproj
+     ============================================================
+     Summary:
+       The application‑layer portion of the SharedKernel.
+       Contains abstractions and behaviours that are shared
+       across all modules' Application layers:
+         - MediatR command/query interfaces (CQRS)
+         - MediatR pipeline behaviours (validation, logging)
+         - Custom exceptions (ValidationException, NotFoundException)
+
+       Dependencies:
+         - SharedKernel.Domain        (Result, Entity, etc.)
+         - MediatR.Contracts          (IRequest, IRequestHandler)
+         - FluentValidation           (optional, for ValidationBehaviour)
+         - Microsoft.Extensions.Logging (optional, for LoggingBehaviour)
+
+       Rules:
+         - Must NOT reference any module project.
+         - Must NOT reference any infrastructure project.
+         - Must remain framework‑aware but implementation‑agnostic.
+     ============================================================ -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- TargetFramework, Nullable, ImplicitUsings come from Directory.Build.props -->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SharedKernel.Domain\SharedKernel.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- MediatR contracts – only the interfaces, no DI registration here.
+         The actual MediatR implementation is registered in each module's
+         Application layer via DependencyInjection.cs. -->
+        <PackageReference Include="MediatR.Contracts" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- FluentValidation – used by ValidationBehaviour to validate
+         MediatR requests before they reach handlers. -->
+        <PackageReference Include="FluentValidation" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Microsoft.Extensions.Logging – used by LoggingBehaviour
+         for structured logging of every command/query. -->
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    </ItemGroup>
+
+</Project>

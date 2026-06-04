@@ -74,6 +74,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SharedKernel.Domain", "Shar
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel.Domain", "SharedKernel.Domain\SharedKernel.Domain.csproj", "{168403D1-2558-488A-82EC-449AD7D28726}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SharedKernel.Application", "SharedKernel.Application", "{BD6AAB8E-5A3C-42DA-AE99-5A8CB6E7E11B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel.Application", "SharedKernel.Application\SharedKernel.Application.csproj", "{70666445-02B1-476A-BA27-FB2EC963BE5C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -84,6 +88,10 @@ Global
 		{168403D1-2558-488A-82EC-449AD7D28726}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{168403D1-2558-488A-82EC-449AD7D28726}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{168403D1-2558-488A-82EC-449AD7D28726}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70666445-02B1-476A-BA27-FB2EC963BE5C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70666445-02B1-476A-BA27-FB2EC963BE5C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70666445-02B1-476A-BA27-FB2EC963BE5C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70666445-02B1-476A-BA27-FB2EC963BE5C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -98,6 +106,8 @@ Global
 		{028AAFA4-10B8-48D2-A937-2FFDE5BAD1BF} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{C41F91CF-AB79-481D-93B0-061F81FA18EB} = {028AAFA4-10B8-48D2-A937-2FFDE5BAD1BF}
 		{168403D1-2558-488A-82EC-449AD7D28726} = {C41F91CF-AB79-481D-93B0-061F81FA18EB}
+		{BD6AAB8E-5A3C-42DA-AE99-5A8CB6E7E11B} = {028AAFA4-10B8-48D2-A937-2FFDE5BAD1BF}
+		{70666445-02B1-476A-BA27-FB2EC963BE5C} = {BD6AAB8E-5A3C-42DA-AE99-5A8CB6E7E11B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {6EDB1AD4-14DB-4CFE-B5D9-5E4BD4C0D3BC}
