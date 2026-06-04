@@ -61,6 +61,8 @@
         <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
         <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.8" />
         <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.9.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
+        <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.9.0-beta.2" />
 
         <!-- ========================================================
              Rate Limiting (ADR-020)
