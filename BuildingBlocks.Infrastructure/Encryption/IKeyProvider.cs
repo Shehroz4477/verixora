@@ -13,10 +13,9 @@
 //   service itself.
 //
 //   In VERIXORA, the concrete implementation (`KeyProvider`) holds a
-//   dictionary of keys loaded from configuration (which itself comes
-//   from a secrets manager).  The encryption service always uses
-//   `CurrentKey` for new encryptions and calls `TryGetKey` to find
-//   the right key for decryption.
+//   dictionary of keys loaded from configuration.  The encryption
+//   service always uses `CurrentKey` for new encryptions and calls
+//   `TryGetKey` to find the right key for decryption.
 //
 //   Key rotation is supported because multiple keys can be stored;
 //   old data carries the key ID in its ciphertext header, and
@@ -37,14 +36,11 @@
 //      that references this assembly.
 //
 // 3. **ReadOnlyMemory<byte>** (return type / out parameter):
-//    - Represents a read‑only view of a contiguous region of memory.
-//    - Unlike `byte[]`, the underlying bytes cannot be modified
-//      **through** a `ReadOnlyMemory<byte>`.  This prevents accidental
-//      mutation of cryptographic key material by the consumer.
-//    - **Important**: It does NOT guarantee that the underlying
-//      memory is immutable; the provider implementation could still
-//      modify the original array internally.  It is a view, not a
-//      secure enclave.
+//    - Represents a **read‑only view** over a region of memory.
+//      The consumer can read the bytes but cannot modify the
+//      underlying buffer through this view.  It does NOT guarantee
+//      that the underlying memory is immutable – that is the
+//      responsibility of the implementation.
 //    - It is a **value type** (struct) and can be used in
 //      interfaces and async methods (unlike `Span<byte>`, which is
 //      a ref struct and cannot be a generic type argument or used
@@ -64,7 +60,7 @@
 // 6. **bool TryGetKey(...)** pattern:
 //    - Known as the "Try‑Parse" pattern.  It avoids throwing
 //      exceptions for expected failures (like a rotated‑out key).
-//    - This is more efficient and clearer than catching
+//      This is more efficient and clearer than catching
 //      `KeyNotFoundException`.
 //
 // 7. **Read‑only property** (`CurrentKey { get; }`):
@@ -81,7 +77,6 @@
 
 using System.Security.Cryptography;
 using System.Text;
-using BuildingBlocks.Infrastructure.Encryption;
 
 namespace BuildingBlocks.Infrastructure.Encryption;
 
@@ -91,21 +86,6 @@ namespace BuildingBlocks.Infrastructure.Encryption;
 /// without changing the encryption logic (memory, vault, HSM,
 /// cloud provider).
 /// </summary>
-/// <remarks>
-/// <para>
-/// All implementations MUST be <b>thread‑safe</b> and safe for
-/// concurrent reads during key rotation.  The returned
-/// <see cref="ReadOnlyMemory{T}"/> views are read‑only for the
-/// consumer, but the provider must take care not to mutate the
-/// underlying byte arrays while they are in use.
-/// </para>
-/// <para>
-/// This interface does NOT provide key isolation or secure memory
-/// protection.  Key material is stored in managed memory and is not
-/// encrypted at rest within the process.  For hardware‑backed keys,
-/// implement a custom provider that interfaces with an HSM or KMS.
-/// </para>
-/// </remarks>
 public interface IKeyProvider
 {
     /// <summary>
@@ -114,6 +94,14 @@ public interface IKeyProvider
     /// be a valid 32‑byte AES‑256 key.
     /// </summary>
     ReadOnlyMemory<byte> CurrentKey { get; }
+
+
+    /// <summary>
+    /// Gets the normalised hex identifier of the current key.
+    /// This ID is embedded in the ciphertext header so decryption
+    /// can select the correct key.
+    /// </summary>
+    string CurrentKeyId { get; }
 
     /// <summary>
     /// Attempts to retrieve the AES‑256 key material for the
@@ -144,18 +132,14 @@ public interface IKeyProvider
     /// lowercase hex (Guid "N" format).
     /// </summary>
     /// <remarks>
-    /// <para>
     /// The returned collection is a point‑in‑time copy; subsequent
     /// changes to the provider's internal state will not affect it.
     /// This method may allocate a new collection on every call.
-    /// </para>
-    /// <para>
-    /// The order of the returned keys is <b>not guaranteed</b> and
-    /// may differ between calls.
-    /// </para>
     /// </remarks>
     IReadOnlyCollection<string> GetKeyIds();
 }
+
+
 
 
 //// Assume an IKeyProvider instance is injected via the constructor:
@@ -166,8 +150,8 @@ public interface IKeyProvider
 //// ================================================================
 //byte[] plaintext = Encoding.UTF8.GetBytes("user@example.com");
 //    ReadOnlyMemory<byte> keyMemory = _keyProvider.CurrentKey;
-//    // keyMemory.Span gives a ReadOnlySpan<byte> for use with AesGcm.
-//    // IMPORTANT: Span is stack‑only; do not capture or store it.
+//    // keyMemory is a read‑only view; we can access the span:
+//    ReadOnlySpan<byte> keySpan = keyMemory.Span; // for use with AesGcm
 
 //    // ================================================================
 //    // SCENARIO 2: Decrypting old data (may use ANY key)

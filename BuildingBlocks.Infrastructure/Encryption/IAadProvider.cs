@@ -3,7 +3,7 @@
 // ====================================================================
 //
 // ARCHITECTURAL ROLE:
-//   This interface defines the contract for constructing the
+//   This interface defines the **contract** for constructing the
 //   **Additional Authenticated Data** (AAD) used by AES‑GCM.
 //   AAD is unencrypted data that is cryptographically bound to the
 //   ciphertext: if the AAD changes even by a single byte, decryption
@@ -41,6 +41,9 @@
 //      underlying buffer through this view.  It does NOT guarantee
 //      that the underlying memory is immutable – that is the
 //      responsibility of the implementation.
+//    - It is a **value type** (struct) and can be used in interfaces
+//      and async methods (unlike `Span<byte>`, which is a ref struct
+//      and cannot be used as a generic type argument or in async methods).
 //
 // 4. **EncryptionContext** parameter:
 //    - An immutable `record` (already `sealed record`) that carries
@@ -93,7 +96,7 @@ public interface IAadProvider
 
 
 
-// Assume an IAadProvider instance is injected via the constructor:
+//// Assume an IAadProvider instance is injected via the constructor:
 //// private readonly IAadProvider _aadProvider;
 
 //// ================================================================
@@ -106,7 +109,6 @@ public interface IAadProvider
 //    ReadOnlyMemory<byte> aad = _aadProvider.BuildAad(context, version);
 
 //    // The AAD is read‑only; we can pass its Span to AesGcm.
-//    // aadMemory.Span gives a ReadOnlySpan<byte> for the crypto call.
 //    // Example: aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, aad.Span);
 
 //    // ================================================================
