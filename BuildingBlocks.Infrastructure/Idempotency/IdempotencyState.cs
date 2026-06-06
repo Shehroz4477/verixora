@@ -1,5 +1,4 @@
 namespace BuildingBlocks.Infrastructure.Idempotency;
-
 /// <summary>
 /// The lifecycle state of an idempotency key.
 /// </summary>
@@ -15,7 +14,12 @@ public enum IdempotencyState
     InProgress,
 
     /// <summary>
-    /// The command completed and its response is available.
+    /// The command completed successfully and its response is available.
     /// </summary>
-    Completed
+    Completed,
+
+    /// <summary>
+    /// The command failed permanently – its error response is stored.
+    /// </summary>
+    Failed
 }

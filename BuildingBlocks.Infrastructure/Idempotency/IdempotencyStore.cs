@@ -4,20 +4,26 @@
 //
 // ARCHITECTURAL ROLE:
 //   Implements the **Idempotency pattern** required by ADR‑016.
-//   All state‑changing device commands (lock, unlock, firmware update)
-//   must carry an `Idempotency‑Key` header.
+//   All state‑changing device commands must carry an
+//   `Idempotency‑Key` header.
 //
-//   The store provides three independent operations:
-//     1. **Reserve** – atomically inserts the key with a NULL response.
-//        If a non‑expired record already exists, the reservation fails.
-//        If an expired record exists, it is **replaced** atomically,
-//        allowing the key to be reused after the TTL window.
+//   The store provides four operations:
+//     1. **Reserve** – atomically inserts the key with a NULL response
+//        and an initial status of `InProgress`.  If a non‑expired
+//        record already exists, the reservation fails.  If an expired
+//        record exists, it is **replaced** atomically, allowing the
+//        key to be reused after the TTL window.  The reservation
+//        returns a unique `OwnerExecutionId` that the caller must
+//        use for all subsequent updates.
 //     2. **Store response** – after successful command execution,
-//        updates the record with the actual response body.  The update
-//        only succeeds if the record is still `InProgress`
-//        (Response IS NULL) AND the record has not expired.
-//     3. **Get state** – returns the current lifecycle state of an
-//        idempotency key: NotFound, InProgress, or Completed.
+//        updates the record with the response body and sets the
+//        status to `Completed`.  The update only succeeds if the
+//        caller still owns the reservation (matching
+//        `OwnerExecutionId`) and the record is still `InProgress`.
+//     3. **Mark failed** – permanently marks the command as `Failed`,
+//        preventing the record from staying `InProgress` forever.
+//     4. **Get state** – returns the current lifecycle state of an
+//        idempotency key: NotFound, InProgress, Completed, or Failed.
 //
 //   STRICT IDEMPOTENCY RULE:
 //     Once a key has been reserved, the command associated with that
@@ -32,8 +38,8 @@
 //       - INSERTS a new row if no row exists.
 //       - If a row exists AND it is expired (judged by the database
 //         server’s own clock, `NOW()`), the UPDATE clause replaces it
-//         (new timestamps, NULL response) – one row affected →
-//         reservation succeeds.
+//         (new timestamps, NULL response, new OwnerExecutionId) – one
+//         row affected → reservation succeeds.
 //       - If a row exists AND it is NOT expired, the WHERE clause
 //         prevents the UPDATE – zero rows affected → reservation fails.
 //
@@ -43,42 +49,23 @@
 //     updated (non‑expired) row.  Using the server’s clock eliminates
 //     client‑side clock skew as a factor.
 //
-//   RESPONSE UPDATE PROTECTION:
-//     The `StoreResponseAsync` method uses a conditional UPDATE:
-//         UPDATE … WHERE Key = @key AND Response IS NULL AND ExpiresAtUtc > NOW()
-//     This guarantees that a late writer cannot write into an
-//     expired row, and that the response is only set once.
-//     However, if the key is reused after expiry (a new reservation
-//     replaces the old row), the old worker could theoretically
-//     still satisfy the conditions and overwrite the new response.
-//     This scenario is effectively impossible in practice because
-//     MQTT commands complete in seconds and the TTL is 24 hours.
-//     A future enterprise hardening phase may add a lease/version
-//     column to establish absolute ownership across key reuse.
+//   STATE TRANSITION GUARDS:
+//     StoreResponseAsync and MarkFailedAsync require the record to
+//     be in the `InProgress` state.  Once a record is Completed or
+//     Failed, no further changes are allowed.  This prevents late
+//     or duplicate writers from corrupting the final result.
 //
-//   TTL SEMANTICS:
-//     Keys expire after 24 hours.  An expired row is automatically
-//     replaced on the next reservation attempt, with no cleanup job
-//     or extra rows needed.
-//
-//   CRASH RECOVERY (future enhancement):
-//     If a command crashes after reservation, the key remains
-//     InProgress until expiry (24 hours).  For faster recovery, a
-//     future version can add a `LockedUntilUtc` lease with heartbeats.
-//     This is acceptable for MVP.
+//   KNOWN LIMITATION – Ownership Expiry:
+//     If a worker crashes after reservation, the record stays
+//     InProgress until the TTL expires (24 hours).  There is no
+//     heartbeat or lease mechanism in MVP.  A future version can
+//     add a `LockedUntilUtc` column for fine‑grained lease recovery.
 //
 //   REQUIRED SCHEMA:
-//     The database table `IdempotencyRecords` must have a single
-//     **unique constraint on `Key` only**.
-//
-//   TRADE‑OFFS:
-//     This design is physically race‑safe and functionally correct
-//     for VERIXORA’s MQTT‑based IoT commands.  It does not provide
-//     mathematically formal idempotency under all possible retry
-//     patterns (e.g., an old worker writing to a reused key).
-//     These edge cases are extremely unlikely in practice and would
-//     require a lease‑based system.  For MVP, the current approach
-//     is the right balance of safety and simplicity.
+//     The table `IdempotencyRecords` must have:
+//       - A **unique constraint on `Key` only**.
+//       - A `Status` column (InProgress, Completed, Failed).
+//       - An `OwnerExecutionId` column (nullable, for ownership).
 //
 // --------------------------------------------------------------------
 // C# CONCEPTS USED IN THIS FILE:
@@ -87,23 +74,21 @@
 // 2. **DbContext injection** – decouples the store from any module.
 // 3. **async / await** – all I/O is asynchronous.
 // 4. **ExecuteSqlInterpolatedAsync** – safe, parameterised SQL.
-// 5. **enum IdempotencyState** – explicit three‑state machine.
+// 5. **enum IdempotencyState / ReserveResult** – explicit state
+//    machines and result types.
 // 6. **Input validation** – key length and response size caps.
 // 7. **internal persistence model** – `IdempotencyRecord` is hidden.
 // 8. **Atomic UPSERT with `NOW()`** – the WHERE clause uses the
 //    database server’s clock for deterministic expiry evaluation.
-// 9. **Conditional UPDATE with expiry check** – `WHERE Response IS NULL
-//    AND ExpiresAtUtc > NOW()` protects against late writes into
-//    expired rows and duplicate response setting.
-// 10. **LINQ query with `SingleOrDefaultAsync`** – used in the
-//     state lookup to avoid raw SQL and EF compatibility issues.
+// 9. **Conditional UPDATE with state guard** – `WHERE Status =
+//    'InProgress'` ensures that state transitions are only made
+//    from the correct initial state.
 // ====================================================================
 
 using System.Collections.Generic;
-using System.Numerics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+using OpenTelemetry.Trace;
 
 namespace BuildingBlocks.Infrastructure.Idempotency;
 
@@ -133,43 +118,47 @@ public sealed class IdempotencyStore
 
     /// <summary>
     /// Tries to atomically reserve the given idempotency key.
+    /// If successful, returns an execution ID that must be used for
+    /// <see cref="StoreResponseAsync"/> or <see cref="MarkFailedAsync"/>.
     /// An expired record is silently replaced, allowing key reuse.
-    /// Expiry is determined by the database server’s clock (<c>NOW()</c>).
     /// </summary>
     /// <returns>
-    /// <c>true</c> if the key was successfully reserved – the caller
-    /// MUST execute the command and then call
-    /// <see cref="StoreResponseAsync"/>.
-    /// <c>false</c> if a non‑expired record already exists – the
-    /// caller MUST skip command execution and call
-    /// <see cref="GetStateAsync"/>.
+    /// A <see cref="ReserveResult"/> indicating whether the key was
+    /// acquired, and the execution ID if acquired.
     /// </returns>
-    public async Task<bool> TryReserveAsync(string key)
+    public async Task<(ReserveResult Result, string? ExecutionId)> TryReserveAsync(string key)
     {
         // Validate the key before touching the database.
         ValidateKey(key);
 
         var now = DateTime.UtcNow;
         var expires = now.AddHours(24);
+        var executionId = Guid.NewGuid().ToString("N");   // 32‑char hex string
 
         // Single atomic UPSERT.
         // The WHERE clause uses the database server’s NOW() function
         // so all concurrent callers use the same time reference.
         int rowsAffected = await _context.Database
             .ExecuteSqlInterpolatedAsync($@"
-                INSERT INTO ""IdempotencyRecords"" (""Key"", ""Response"", ""CreatedAtUtc"", ""ExpiresAtUtc"")
-                VALUES ({key}, NULL, {now}, {expires})
+                INSERT INTO ""IdempotencyRecords""
+                (""Key"", ""Response"", ""OwnerExecutionId"", ""Status"", ""CreatedAtUtc"", ""ExpiresAtUtc"")
+                VALUES ({key}, NULL, {executionId}, 'InProgress', {now}, {expires})
                 ON CONFLICT (""Key"") DO UPDATE
                 SET ""CreatedAtUtc"" = EXCLUDED.""CreatedAtUtc"",
                     ""ExpiresAtUtc"" = EXCLUDED.""ExpiresAtUtc"",
-                    ""Response"" = NULL
+                    ""Response"" = NULL,
+                    ""OwnerExecutionId"" = EXCLUDED.""OwnerExecutionId"",
+                    ""Status"" = 'InProgress'
                 WHERE ""IdempotencyRecords"".""ExpiresAtUtc"" < NOW()
             ")
             .ConfigureAwait(false);
 
         // rowsAffected == 1 → reservation succeeded (new or replaced expired).
         // rowsAffected == 0 → non‑expired record already exists.
-        return rowsAffected == 1;
+        if (rowsAffected == 1)
+            return (ReserveResult.Acquired, executionId);
+
+        return (ReserveResult.AlreadyExists, null);
     }
 
     // ----------------------------------------------------------------
@@ -178,57 +167,100 @@ public sealed class IdempotencyStore
 
     /// <summary>
     /// Stores the actual response for a previously reserved key.
-    /// The update only succeeds if the record is still
-    /// <see cref="IdempotencyState.InProgress"/> (Response IS NULL)
-    /// AND the record has not expired.  If the response has already
-    /// been set or the record has expired, this method throws.
+    /// The update only succeeds if the caller still owns the
+    /// reservation (matching <paramref name="executionId"/>) and the
+    /// record is still in the <see cref="IdempotencyState.InProgress"/>
+    /// state.  Once a record is Completed or Failed, no further
+    /// changes are allowed.
     /// </summary>
     /// <param name="key">The reserved idempotency key.</param>
+    /// <param name="executionId">The execution ID from <see cref="TryReserveAsync"/>.</param>
     /// <param name="response">The response body to store.</param>
-    public async Task StoreResponseAsync(string key, string response)
+    public async Task StoreResponseAsync(string key, string executionId, string response)
     {
-        // Validate input.
+        // Validate inputs.
         ValidateKey(key);
+        if (string.IsNullOrEmpty(executionId))
+            throw new ArgumentNullException(nameof(executionId));
         if (string.IsNullOrEmpty(response))
             throw new ArgumentException("Response cannot be null or empty.", nameof(response));
         if (response.Length > MaxResponseLength)
             throw new ArgumentException(
                 $"Response exceeds maximum length of {MaxResponseLength} characters.", nameof(response));
 
-        // Conditional UPDATE: only set the response if it is still NULL
-        // AND the record has not expired.  This prevents a late writer
-        // from storing a response into an already‑expired row.
-        // Note: if the key has been reused after expiry, an old worker
-        // could still pass these checks.  See the class‑level remarks
-        // for a discussion of this trade‑off.
+        // Conditional UPDATE: only set the response if the caller
+        // still owns the reservation and the record is still InProgress.
         int rows = await _context.Database
             .ExecuteSqlInterpolatedAsync($@"
                 UPDATE ""IdempotencyRecords""
-                SET ""Response"" = {response}
+                SET ""Response"" = {response},
+                    ""Status"" = 'Completed'
                 WHERE ""Key"" = {key}
-                  AND ""Response"" IS NULL
+                  AND ""OwnerExecutionId"" = {executionId}
+                  AND ""Status"" = 'InProgress'
                   AND ""ExpiresAtUtc"" > NOW()
             ")
             .ConfigureAwait(false);
 
         if (rows == 0)
             throw new InvalidOperationException(
-                $"Could not store response for key '{key}'. " +
-                "Either the key does not exist, the record has expired, or the response was already stored.");
+                "Cannot store response: the key does not exist, the record has expired, " +
+                "the response was already stored, or you are not the current owner.");
     }
 
     // ----------------------------------------------------------------
-    // Step 3 – Retrieve the state of an idempotency key
+    // Step 3 – Mark a command as permanently failed
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Marks the command as permanently failed, preventing it from
+    /// staying InProgress forever.  Only the current owner may call
+    /// this method, and only if the record is still InProgress.
+    /// </summary>
+    /// <param name="key">The reserved idempotency key.</param>
+    /// <param name="executionId">The execution ID from <see cref="TryReserveAsync"/>.</param>
+    /// <param name="errorResponse">The error response body to store.</param>
+    public async Task MarkFailedAsync(string key, string executionId, string errorResponse)
+    {
+        ValidateKey(key);
+        if (string.IsNullOrEmpty(executionId))
+            throw new ArgumentNullException(nameof(executionId));
+        if (string.IsNullOrEmpty(errorResponse))
+            throw new ArgumentException("Error response cannot be null or empty.", nameof(errorResponse));
+        if (errorResponse.Length > MaxResponseLength)
+            throw new ArgumentException(
+                $"Error response exceeds maximum length of {MaxResponseLength} characters.", nameof(errorResponse));
+
+        // Same guard as StoreResponseAsync – only InProgress records
+        // may transition to Failed.
+        int rows = await _context.Database
+            .ExecuteSqlInterpolatedAsync($@"
+                UPDATE ""IdempotencyRecords""
+                SET ""Response"" = {errorResponse},
+                    ""Status"" = 'Failed'
+                WHERE ""Key"" = {key}
+                  AND ""OwnerExecutionId"" = {executionId}
+                  AND ""Status"" = 'InProgress'
+                  AND ""ExpiresAtUtc"" > NOW()
+            ")
+            .ConfigureAwait(false);
+
+        if (rows == 0)
+            throw new InvalidOperationException(
+                "Cannot mark as failed: the key does not exist, the record has expired, " +
+                "the response was already stored, or you are not the current owner.");
+    }
+
+    // ----------------------------------------------------------------
+    // Step 4 – Retrieve the state of an idempotency key
     // ----------------------------------------------------------------
 
     /// <summary>
     /// Returns the current lifecycle state of the given idempotency key,
-    /// along with the response if the command has completed.
+    /// along with the response if the command has completed or failed.
     ///
-    /// Expiry is checked using the client’s UTC clock for simplicity.
-    /// The reservation logic uses the server clock (`NOW()`) for
-    /// atomicity; the state query’s slight timing difference is
-    /// acceptable for MVP.
+    /// Expiry is evaluated here for query purposes using the
+    /// application’s UTC clock.
     /// </summary>
     public async Task<(IdempotencyState State, string? Response)> GetStateAsync(string key)
     {
@@ -236,20 +268,23 @@ public sealed class IdempotencyStore
 
         var now = DateTime.UtcNow;
 
-        // Use a standard LINQ query to avoid EF compatibility issues
-        // with raw SQL (FromSqlInterpolated not always available).
+        // Read the record.  Expired rows are ignored.
         var record = await _context.Set<IdempotencyRecord>()
-            .AsNoTracking()                               // read‑only query – faster
+            .AsNoTracking()                               // read‑only – faster
             .SingleOrDefaultAsync(r => r.Key == key && r.ExpiresAtUtc > now)
             .ConfigureAwait(false);
 
         if (record is null)
             return (IdempotencyState.NotFound, null);
 
-        if (record.Response is null)
-            return (IdempotencyState.InProgress, null);
-
-        return (IdempotencyState.Completed, record.Response);
+        // Map the Status string to an IdempotencyState enum value.
+        return record.Status switch
+        {
+            "InProgress" => (IdempotencyState.InProgress, null),
+            "Completed" => (IdempotencyState.Completed, record.Response),
+            "Failed" => (IdempotencyState.Failed, record.Response),
+            _ => (IdempotencyState.NotFound, null)   // defensive fallback
+        };
     }
 
     // ----------------------------------------------------------------
@@ -266,30 +301,31 @@ public sealed class IdempotencyStore
     }
 }
 
-
-//Dry‑run – complete idempotency lifecycle with this store:
+//Dry‑run – complete lifecycle with the store:
 
 //Client sends: POST /api/v1/smartlocks/{id}/ unlock
 //Headers: Idempotency - Key: abc - 123 - def
 
-//Thread A(first request)            Thread B(duplicate, same key)
-//─────────────────────────────────   ─────────────────────────────────
-//1.store.TryReserveAsync(key)       1.store.TryReserveAsync(key)
-//   → UPSERT inserts new row            → UPSERT detects conflict
-//   → rowsAffected=1 → true             → WHERE not expired → do nothing
-//                                       → rowsAffected=0 → false
-//2. Executes unlock pipeline          2. Calls store.GetStateAsync(key)
-//3. On success:                          → State = InProgress
-//   store.StoreResponseAsync(key,
-//   resultJson)
-//   → UPDATE sets response
-//4. Returns 200 OK                    3. Returns 200 OK with original response
+//First request(key is new):
+//  1.TryReserveAsync("abc-123-def")
+//     → UPSERT inserts new row, status = InProgress.
+//     → Returns(Acquired, "exec-1").
+//  2.Command executes and returns 200 OK.
+//  3. StoreResponseAsync("abc-123-def", "exec-1", body)
+//     → UPDATE sets Response, Status = Completed.
+//  4. Client receives 200 OK.
 
+//Duplicate request (same key, same client):
+//  1.TryReserveAsync("abc-123-def")
+//     → UPSERT finds non‑expired row → rowsAffected = 0.
+//     → Returns (AlreadyExists, null).
+//  2. GetStateAsync("abc-123-def")
+//     → Returns (Completed, storedBody).
+//  3. Middleware replays the original response.
 
-//Handling expired key reuse(24 hours later):
-//Thread C:
-//   TryReserveAsync("abc-123-def")
-//   → UPSERT detects existing row
-//   → WHERE ExpiresAtUtc<NOW() → true
-//   → UPDATE replaces row(new timestamps, NULL response)
-//   → rowsAffected=1 → reservation succeeds
+//Command failure:
+//  1.TryReserveAsync → (Acquired, "exec-2").
+//  2.Command throws or returns non‑2xx.
+//  3. MarkFailedAsync("abc-123-def", "exec-2", errorPayload)
+//     → UPDATE sets Response, Status = Failed.
+//  4. Client receives the error response.
