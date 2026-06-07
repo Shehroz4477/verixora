@@ -1,0 +1,35 @@
+<!-- ============================================================
+     VERIXORA – Identity.Domain.csproj
+     ============================================================
+     Summary:
+       The domain layer of the Identity module.  This project
+       contains the core business entities (User, Home, Session,
+       ApiKey, etc.), value objects, domain events, and domain
+       service interfaces that define the identity and tenant
+       management logic.
+
+       Architecture:
+         - Depends ONLY on SharedKernel.Domain (Entity, ValueObject,
+           AggregateRoot, etc.).
+         - Must NOT reference any other module.
+         - Must NOT reference any infrastructure or application
+           layer project.
+         - All classes are persistence‑ignorant.
+
+       Why:
+         Keeps the identity business rules pure and testable,
+         isolated from the rest of the system.
+     ============================================================ -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- TargetFramework, Nullable, ImplicitUsings from Directory.Build.props -->
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\SharedKernel.Domain\SharedKernel.Domain.csproj" />
+    </ItemGroup>
+
+    <!-- Only dependency is the SharedKernel domain primitives -->
+
+</Project>
