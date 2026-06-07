@@ -148,6 +148,18 @@ public sealed class AesGcmEncryptionService : IEncryptionService
         return Encoding.UTF8.GetString(plainBytes);
     }
 
+    /// <inheritdoc />
+    public async Task<string> EncryptAsync(
+        string filePath,
+        EncryptionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        // Read the entire file as bytes, encrypt them, and return Base64.
+        var plainBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
+        var cipherBytes = Encrypt(plainBytes, context);
+        return Convert.ToBase64String(cipherBytes);
+    }
+
     // ----------------------------------------------------------------
     // Core binary encryption
     // ----------------------------------------------------------------

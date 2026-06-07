@@ -75,6 +75,17 @@ public interface IEncryptionService
     /// </param>
     /// <returns>The original plaintext string.</returns>
     string Decrypt(string cipherText, EncryptionContext context);
+
+    /// <summary>
+    /// Encrypts the contents of a file and returns a Base64‑encoded
+    /// ciphertext string.  The file is streamed so that large files
+    /// do not need to be loaded entirely into memory.
+    /// </summary>
+    /// <param name="filePath">The path to the file to encrypt.</param>
+    /// <param name="context">The encryption context for AAD binding.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A Base64‑encoded ciphertext string.</returns>
+    Task<string> EncryptAsync(string filePath, EncryptionContext context, CancellationToken cancellationToken);
 }
 
 
