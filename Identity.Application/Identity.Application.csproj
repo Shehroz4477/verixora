@@ -1,0 +1,41 @@
+<!-- ============================================================
+     VERIXORA – Identity.Application.csproj
+     ============================================================
+     Summary:
+       The application layer of the Identity module.  This project
+       contains CQRS command/query handlers, DTOs, interfaces for
+       repositories and services, and the MediatR pipeline setup
+       for the Identity bounded context.
+
+       Architecture:
+         - Depends on Identity.Domain (entities, value objects,
+           domain events).
+         - Depends on SharedKernel.Application (CQRS abstractions,
+           pipeline behaviours, Result types).
+         - Must NOT reference Identity.Infrastructure or
+           Identity.Presentation.
+         - Must NOT reference any other module directly.
+
+       Why:
+         Keeps the application logic (use cases) separated from
+         both domain and infrastructure, following Clean
+         Architecture and Vertical Slice principles.
+     ============================================================ -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- TargetFramework, Nullable, ImplicitUsings from Directory.Build.props -->
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="MediatR" />
+        <PackageReference Include="FluentValidation" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <ProjectReference Include="..\Identity.Domain\Identity.Domain.csproj" />
+      <ProjectReference Include="..\SharedKernel.Application\SharedKernel.Application.csproj" />
+    </ItemGroup>
+
+</Project>

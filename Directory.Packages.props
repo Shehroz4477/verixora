@@ -118,6 +118,7 @@
         <!-- FluentValidation – used by ValidationBehaviour to validate
              MediatR requests before they reach handlers. -->
         <PackageVersion Include="FluentValidation" Version="11.9.2" />
+        <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.2" />
 
         <!-- Microsoft.Extensions.Logging.Abstractions – used by
              LoggingBehaviour for structured logging of every command/query. -->
