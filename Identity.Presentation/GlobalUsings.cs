@@ -25,6 +25,7 @@ global using System.Threading.Tasks;
 // --- ASP.NET Core MVC ---
 global using Microsoft.AspNetCore.Mvc;         // [ApiController], [Route], ControllerBase, IActionResult
 global using Microsoft.AspNetCore.Http;        // StatusCodes, HttpContext, IHeaderDictionary
+global using Route = Microsoft.AspNetCore.Mvc.RouteAttribute; // Resolve the ambiguity between MVC and Blazor Route attributes.
 
 // --- MediatR (CQRS dispatching) ---
 global using MediatR;                           // IMediator for sending commands/queries

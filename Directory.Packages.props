@@ -88,6 +88,12 @@
         <PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="6.5.0" />
 
         <!-- ========================================================
+                API Versioning (ADR-015)
+            ======================================================== -->
+        <PackageVersion Include="Asp.Versioning.Mvc" Version="8.1.0" />
+        <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
+
+        <!-- ========================================================
              Testing Frameworks
              ======================================================== -->
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />

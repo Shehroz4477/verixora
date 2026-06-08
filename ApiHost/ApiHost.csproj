@@ -1,0 +1,51 @@
+<!-- ============================================================
+     VERIXORA – ApiHost.csproj
+     ============================================================
+     Summary:
+       The executable host that starts the VERIXORA API.  It
+       references all module Presentation layers and configures
+       the ASP.NET Core pipeline.
+
+       Architecture:
+         - This is the composition root.  It knows about all
+           modules and their DI extensions.
+         - Must NOT contain business logic.
+         - Uses BuildingBlocks.Infrastructure for cross‑cutting
+           concerns (logging, tracing, rate limiting, encryption).
+
+       Key references:
+         - Identity.Presentation (controllers)
+         - BuildingBlocks.Infrastructure (base DbContext, etc.)
+     ============================================================ -->
+
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <!-- ================================================================
+       Project references
+       ================================================================ -->
+    <ItemGroup>
+        <ProjectReference Include="..\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
+        <ProjectReference Include="..\Identity.Presentation\Identity.Presentation.csproj" />
+    </ItemGroup>
+
+    <!-- ================================================================
+       NuGet packages (all versions in Directory.Packages.props)
+       ================================================================ -->
+    <ItemGroup>
+        <!-- Serilog – structured logging (replaces default logger) -->
+        <PackageReference Include="Serilog.AspNetCore" />
+
+        <!-- Swagger / OpenAPI – interactive API docs for development -->
+        <PackageReference Include="Swashbuckle.AspNetCore" />
+
+        <!-- ASP.NET API versioning – /api/v1/ routing -->
+        <PackageReference Include="Asp.Versioning.Mvc" />
+        <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+
+        <!-- OpenTelemetry – distributed tracing (ADR‑021) -->
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+        <PackageReference Include="OpenTelemetry.Exporter.Console" />
+    </ItemGroup>
+
+</Project>
