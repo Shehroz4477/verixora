@@ -2,28 +2,26 @@
 // VERIXORA – SharedKernel.Application / Abstractions / ICommand.cs
 // ====================================================================
 // Summary:
-//   Marker interface for CQRS commands.
+//   Marker interfaces for CQRS commands.
+//   Now extend MediatR’s IRequest<TResponse> so that commands can be
+//   dispatched via IMediator.Send<TResponse>().
 //
-//   ICommand        – a command that returns a plain Result (no data).
-//   ICommand<TResponse> – a command that returns data on success.
-//
-//   Why two interfaces:
-//     - Some commands only need to signal success/failure (e.g., DeleteUser).
-//     - Other commands need to return data (e.g., RegisterUser returns
-//       the new user's ID and email).
-//     - The generic version ties the command to its response type,
-//       making the contract explicit at compile time.
+//   ICommand              – returns a plain Result
+//   ICommand<TResponse>   – returns a Result<TResponse>
 // ====================================================================
+
+using MediatR;
+using SharedKernel.Domain.Results;
 
 namespace SharedKernel.Application.Abstractions;
 
 /// <summary>
-/// Marker interface for commands that return no data.
+/// A command that returns a plain <see cref="Result"/>.
 /// </summary>
-public interface ICommand { }
+public interface ICommand : IRequest<Result> { }
 
 /// <summary>
-/// Marker interface for commands that return a typed response.
+/// A command that returns a typed <see cref="Result{TResponse}"/>.
 /// </summary>
-/// <typeparam name="TResponse">The type of response returned by the handler.</typeparam>
-public interface ICommand<TResponse> { }
+/// <typeparam name="TResponse">The type of data returned on success.</typeparam>
+public interface ICommand<TResponse> : IRequest<Result<TResponse>> { }
