@@ -23,7 +23,7 @@
 //     1. Email must be non‑empty, contain exactly one '@', and have
 //        a dot in the domain part (e.g., "user@example.com").
 //     2. Email uniqueness across the system is enforced at the
-//        database level (unique index), not here.
+//        database level (unique index on EmailHash), not here.
 //     3. Email must be verified before the user can access protected
 //        resources (enforced in the Application layer).
 //     4. Maximum 5 active sessions per user.
@@ -32,6 +32,26 @@
 //     7. Password hash must never be exposed outside the aggregate.
 //     8. Device fingerprints must be unique within the trusted
 //        devices collection.
+//
+//   EMAIL ENCRYPTION + LOOKUP STRATEGY:
+//     - The Email column is encrypted at rest (AES‑256 via EF Core
+//       value converter), but encrypted data cannot be searched or
+//       used in a unique index because the ciphertext is different
+//       every time (random IV).
+//     - To solve this, we store an **EmailHash** column: SHA‑256 of
+//       the normalised email.  This hash is deterministic, so it can
+//       be indexed and searched.  Lookups and duplicate checks use
+//       EmailHash, not Email.
+//     - The email itself is still stored (encrypted) so it can be
+//       displayed to the user after decryption.
+//
+//   CONCURRENCY CONTROL:
+//     - RowVersion is an EF Core concurrency token.  The database
+//       automatically updates it on every INSERT/UPDATE.  When
+//       EF Core saves changes, it includes the original RowVersion
+//       in the WHERE clause.  If another transaction modified the
+//       row, a DbUpdateConcurrencyException is thrown, preventing
+//       lost updates.
 //
 //   CHILD COLLECTIONS:
 //     - Backed by `List<T>` rather than `HashSet<T>`.  This avoids
@@ -106,23 +126,22 @@
 // 9. **Guard.AgainstNullOrWhiteSpace / Guard.AgainstNull**:
 //    - SharedKernel utility methods that throw clear, consistent
 //      exceptions when preconditions are violated.
-//    - This keeps repetitive validation code out of every method.
 //
-// 10. **DateTime.UtcNow**:
-//     - Always use UTC to avoid time‑zone ambiguity across
-//       different servers, clients, and geographic regions.
+// 10. **SHA256.HashData** (for EmailHash):
+//     - Computes a deterministic hash of the email for fast lookups.
+//     - Used in both the `Register` factory method and the repository
+//       (UserRepository) to ensure the lookup hash matches the stored
+//       hash.
 //
-// 11. **ID‑based lookups** (`_sessions.FirstOrDefault(s => s.Id == id)`):
-//     - Uses the ULID identity to locate entities.  Avoids reliance
-//       on reference equality or overridden `Equals`, which can
-//       break when EF Core proxy classes are involved.
-//
-// 12. **List<T>.RemoveAll** with a predicate:
-//     - Removes all items that match the given condition in a single
-//       pass.  More efficient than iterating and calling `Remove`
-//       individually, which would be O(n²).
+// 11. **byte[] RowVersion**:
+//     - A concurrency token used by EF Core to detect conflicting
+//       updates.  It is automatically updated by the database on
+//       every INSERT or UPDATE.
 // ====================================================================
 
+using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 using Identity.Domain.Events;
 
 namespace Identity.Domain.Entities;
@@ -146,10 +165,17 @@ public class User : AggregateRoot
 
     /// <summary>
     /// The user's unique email address (normalised to lowercase).
-    /// Used for login, communication, and identity verification.
-    /// Uniqueness is enforced by a database unique index.
+    /// Stored encrypted at rest.  Use <see cref="EmailHash"/> for
+    /// lookups and uniqueness enforcement.
     /// </summary>
     public string Email { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// A SHA‑256 hash of the normalised email, used for fast lookups
+    /// and uniqueness enforcement.  Stored as plain text with a
+    /// unique database index.
+    /// </summary>
+    public string EmailHash { get; private set; } = string.Empty;
 
     /// <summary>
     /// The Argon2id hash of the user's password.  The raw password
@@ -164,7 +190,7 @@ public class User : AggregateRoot
 
     /// <summary>
     /// The user's optional phone number (for OTP challenges on
-    /// unrecognised devices).
+    /// unrecognised devices).  Stored encrypted at rest.
     /// </summary>
     public string? PhoneNumber { get; private set; }
 
@@ -172,6 +198,12 @@ public class User : AggregateRoot
     /// UTC timestamp of when the user account was created.
     /// </summary>
     public DateTime CreatedAt { get; private set; }
+
+    /// <summary>
+    /// EF Core concurrency token – prevents lost updates.
+    /// Automatically managed by the database (row version).
+    /// </summary>
+    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     // ----------------------------------------------------------------
     // Child collections (backed by List, exposed as read‑only)
@@ -247,6 +279,7 @@ public class User : AggregateRoot
         var user = new User
         {
             Email = email,
+            EmailHash = ComputeEmailHash(email),
             PasswordHash = passwordHash,
             EmailVerified = false,
             CreatedAt = utcNow
@@ -458,4 +491,62 @@ public class User : AggregateRoot
         // dot (e.g., "example.com").
         return email.LastIndexOf('.') > atIndex;
     }
+
+    /// <summary>
+    /// Computes a SHA‑256 hash of the normalised email for fast
+    /// lookups and uniqueness enforcement.
+    /// </summary>
+    /// <param name="email">The normalised email (lowercase, trimmed).</param>
+    /// <returns>A base64‑encoded SHA‑256 hash (44 characters).</returns>
+    private static string ComputeEmailHash(string email)
+    {
+        var bytes = Encoding.UTF8.GetBytes(email);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToBase64String(hash);
+    }
 }
+
+
+//Dry‑run — complete user lifecycle:
+//1. REGISTRATION
+//   User.Register("Alice@Example.com ", "argon2id-hash", utcNow)
+//   → email = "alice@example.com" (trimmed, lowercased)
+//   → EmailHash = Base64(SHA256("alice@example.com")) = "abc123..."
+//   → User created: EmailVerified = false, CreatedAt = utcNow
+//   → Domain event: UserRegistered
+
+//2. EMAIL VERIFICATION
+//   user.VerifyEmail()
+//   → EmailVerified = true
+//   → Domain event: UserEmailVerified
+//   (calling again does nothing)
+
+//3. LOGIN – CREATE SESSION
+//   user.AddSession("fp-laptop-abc", "203.0.113.1", "Chrome/120", utcNow)
+//   → Sessions.Count = 1
+//   → Domain event: UserSessionCreated
+
+//4. TRUST A DEVICE
+//   user.TrustDevice("fp-phone-xyz", utcNow)
+//   → TrustedDevices.Count = 1
+//   → Domain event: UserDeviceTrusted
+
+//5. ISSUE A REFRESH TOKEN
+//   user.IssueRefreshToken("token-hash-here", utcNow.AddDays(30))
+//   → RefreshTokens.Count = 1
+//   → Domain event: UserRefreshTokenIssued
+
+//6. CHANGE PASSWORD
+//   user.ChangePassword("new-argon2id-hash")
+//   → PasswordHash = "new-argon2id-hash"
+//   → Domain event: UserPasswordChanged
+
+//7. REVOKE REFRESH TOKEN
+//   user.RevokeRefreshToken(token)
+//   → RefreshTokens.Count = 0
+//   → Domain event: UserRefreshTokenRevoked
+
+//8. LOGOUT – REMOVE SESSION
+//   user.RemoveSession(session)
+//   → Sessions.Count = 0
+//   → Domain event: UserSessionRemoved

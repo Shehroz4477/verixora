@@ -1,0 +1,54 @@
+<!-- ============================================================
+     VERIXORA – Identity.Infrastructure.csproj
+     ============================================================
+     Summary:
+       The infrastructure layer of the Identity module.  This
+       project implements the repository interfaces, JWT token
+       service, password hasher, and system clock — all the
+       concrete implementations that the Application layer depends
+       on.
+
+       Architecture:
+         - Depends on Identity.Domain        (entities, value objects)
+         - Depends on Identity.Application   (repository & service interfaces)
+         - Depends on BuildingBlocks.Infrastructure (BaseDbContext, outbox,
+           encryption, health checks, etc.)
+         - Depends on SharedKernel.Domain    (ULID, Entity, ValueObject)
+
+       Why:
+         Keeps the implementation details (EF Core, cryptographic
+         libraries, system clock) separated from the domain and
+         application logic, following Clean Architecture.
+
+       Key packages:
+         - Npgsql.EntityFrameworkCore.PostgreSQL   (database provider)
+         - Microsoft.AspNetCore.Authentication.JwtBearer  (JWT generation/validation)
+         - Konscious.Security.Cryptography.Argon2          (password hashing)
+     ============================================================ -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- TargetFramework, Nullable, ImplicitUsings from Directory.Build.props -->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- EF Core – PostgreSQL provider + relational extensions -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+
+        <!-- Argon2id password hashing -->
+        <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+
+        <!-- JWT authentication (for generating and validating tokens) -->
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
+      <ProjectReference Include="..\Identity.Application\Identity.Application.csproj" />
+      <ProjectReference Include="..\Identity.Domain\Identity.Domain.csproj" />
+      <ProjectReference Include="..\SharedKernel.Domain\SharedKernel.Domain.csproj" />
+    </ItemGroup>
+
+</Project>
