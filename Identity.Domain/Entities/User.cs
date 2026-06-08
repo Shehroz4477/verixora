@@ -219,12 +219,15 @@ public class User : AggregateRoot
     /// </summary>
     /// <param name="email">The user's email address.</param>
     /// <param name="passwordHash">An Argon2id hash of the password.</param>
+    /// <param name="utcNow">
+    /// The current UTC time (injected for determinism and testability).
+    /// </param>
     /// <returns>A new User instance with EmailVerified = false.</returns>
     /// <exception cref="ArgumentException">
     /// If email or passwordHash is null, empty, or has an invalid
     /// format.
     /// </exception>
-    public static User Register(string email, string passwordHash)
+    public static User Register(string email, string passwordHash, DateTime utcNow)
     {
         // Step 1: Validate preconditions.  Fail fast if any input
         // is invalid.
@@ -246,7 +249,7 @@ public class User : AggregateRoot
             Email = email,
             PasswordHash = passwordHash,
             EmailVerified = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = utcNow
         };
 
         // Step 5: Notify the system that a new user has been created.

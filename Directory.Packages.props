@@ -103,7 +103,7 @@
              Utilities
              ======================================================== -->
         <!-- Argon2id password hashing (ADR security: never store raw passwords) -->
-        <PackageVersion Include="Argon" Version="1.0.3" />
+        <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.0" />
 
         <!-- ULID: Universally Unique Lexicographically Sortable Identifier.
              Better than GUID for database indexes (clustered-friendly). -->

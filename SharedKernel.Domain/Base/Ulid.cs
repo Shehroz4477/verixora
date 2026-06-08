@@ -68,6 +68,14 @@ public sealed class Ulid : IEquatable<Ulid>, IComparable<Ulid>
     // Factory Methods
     // ================================================================
 
+    // Insert after the DecodeMap declaration, before the constructor:
+
+    /// <summary>
+    /// The empty ULID (all 16 bytes zero).
+    /// Used for validation checks (e.g., "a valid User ID is required").
+    /// </summary>
+    public static readonly Ulid Empty = new(new byte[16]);
+
     /// <summary>
     /// Creates a new ULID with the current UTC timestamp (48‑bit,
     /// milliseconds) and 80 bits of cryptographic randomness.

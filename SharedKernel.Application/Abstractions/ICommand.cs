@@ -2,34 +2,28 @@
 // VERIXORA – SharedKernel.Application / Abstractions / ICommand.cs
 // ====================================================================
 // Summary:
-//   Marker interface for all CQRS commands.
-//   A command represents a write operation that changes system state
-//   (create, update, delete, etc.).  Every command has exactly one
-//   handler that implements ICommandHandler<TCommand>.
+//   Marker interface for CQRS commands.
 //
-//   Why separate from IQuery:
-//     - Commands mutate state; queries do not (CQS principle).
-//     - Allows the MediatR pipeline to apply different behaviours
-//       to commands (e.g., unit-of-work, idempotency) vs. queries
-//       (e.g., caching, read-only optimisations).
-//     - Architecture tests can verify that command handlers are
-//       registered correctly.
+//   ICommand        – a command that returns a plain Result (no data).
+//   ICommand<TResponse> – a command that returns data on success.
 //
-//   Usage:
-//     public record UnlockDoorCommand(Ulid SmartLockId, Ulid UserId)
-//         : ICommand;
-//
-//   Design note:
-//     ICommand does NOT carry a return type.  Handlers return
-//     Result or Result<T> explicitly, keeping the contract
-//     independent of the return type shape.
+//   Why two interfaces:
+//     - Some commands only need to signal success/failure (e.g., DeleteUser).
+//     - Other commands need to return data (e.g., RegisterUser returns
+//       the new user's ID and email).
+//     - The generic version ties the command to its response type,
+//       making the contract explicit at compile time.
 // ====================================================================
 
 namespace SharedKernel.Application.Abstractions;
 
 /// <summary>
-/// Marker interface for commands (write operations).
+/// Marker interface for commands that return no data.
 /// </summary>
-public interface ICommand
-{
-}
+public interface ICommand { }
+
+/// <summary>
+/// Marker interface for commands that return a typed response.
+/// </summary>
+/// <typeparam name="TResponse">The type of response returned by the handler.</typeparam>
+public interface ICommand<TResponse> { }

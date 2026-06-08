@@ -2,35 +2,27 @@
 // VERIXORA – SharedKernel.Application / Abstractions / ICommandHandler.cs
 // ====================================================================
 // Summary:
-//   Contract for a handler that processes a single type of command.
-//   Each command has exactly one handler.  The handler returns a
-//   Result (or Result<T>) to signal success or domain failure.
+//   Contracts for CQRS command handlers.
 //
-//   Why not use MediatR's IRequestHandler directly everywhere:
-//     - Wrapping it behind our own interface lets us add shared
-//       constraints (e.g., all commands return Result types).
-//     - Architecture tests can verify that every command handler
-//       implements this interface, not just IRequestHandler.
-//     - Future changes to the handler contract (e.g., adding
-//       cancellation token policy) can be done here without
-//       touching every module.
+//   ICommandHandler<TCommand>            – handles a command that
+//     returns a plain Result.
+//   ICommandHandler<TCommand, TResponse> – handles a command that
+//     returns a Result<TResponse> with data.
 //
-//   Usage:
-//     public class UnlockDoorHandler
-//         : ICommandHandler<UnlockDoorCommand>
-//     {
-//         public async Task<Result> Handle(
-//             UnlockDoorCommand command,
-//             CancellationToken cancellationToken)
-//         { ... }
-//     }
+//   Why two interfaces:
+//     - Matches the two ICommand variants.
+//     - Handlers that return data don't need to cast or use object.
+//     - The generic constraint ensures type safety: a command
+//       implementing ICommand<TResponse> can only be handled by
+//       ICommandHandler<TCommand, TResponse>.
 // ====================================================================
+
+using SharedKernel.Domain.Results;
 
 namespace SharedKernel.Application.Abstractions;
 
 /// <summary>
-/// Handles a command of type <typeparamref name="TCommand"/> and
-/// returns a <see cref="Result"/>.
+/// Handles a command that returns no data.
 /// </summary>
 /// <typeparam name="TCommand">The command type (must implement <see cref="ICommand"/>).</typeparam>
 public interface ICommandHandler<TCommand>
@@ -40,4 +32,18 @@ public interface ICommandHandler<TCommand>
     /// Executes the command and returns a Result indicating success or failure.
     /// </summary>
     Task<Result> Handle(TCommand command, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Handles a command that returns a typed response.
+/// </summary>
+/// <typeparam name="TCommand">The command type (must implement <see cref="ICommand{TResponse}"/>).</typeparam>
+/// <typeparam name="TResponse">The type of data returned on success.</typeparam>
+public interface ICommandHandler<TCommand, TResponse>
+    where TCommand : ICommand<TResponse>
+{
+    /// <summary>
+    /// Executes the command and returns a <see cref="Result{TResponse}"/>.
+    /// </summary>
+    Task<Result<TResponse>> Handle(TCommand command, CancellationToken cancellationToken);
 }
