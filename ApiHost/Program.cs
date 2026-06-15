@@ -13,7 +13,7 @@
 //     - The host knows about all modules, but modules don't know
 //       about each other (modular monolith pattern).
 //     - Cross‑cutting concerns (logging, tracing, rate limiting,
-//       health checks) are configured once, here.
+//       health checks, encryption) are configured once, here.
 //     - The host is the single place to change the deployment
 //       topology (e.g., add a new module, enable HTTPS, etc.).
 //
@@ -56,7 +56,13 @@
 //      classes and registers them.  Without this, the host would
 //      not discover the AuthController.
 //
-// 8. **Middleware pipeline** (app.Use...):
+// 8. **AddVerixoraEncryption()**:
+//    - Registers IEncryptionService, IKeyProvider, IAadProvider,
+//      and binds EncryptionOptions from configuration.  Required
+//      by the EF Core EncryptionConverter for column‑level
+//      encryption.
+//
+// 9. **Middleware pipeline** (app.Use...):
 //    - `UseSerilogRequestLogging()` – logs each request.
 //    - `UseRateLimiter()` – enforces ADR‑020 limits.
 //    - `MapHealthChecks("/health")` – exposes /health for
@@ -64,6 +70,7 @@
 //    - `MapControllers()` – maps HTTP routes to controller actions.
 // ====================================================================
 
+using BuildingBlocks.Infrastructure.Encryption;
 using BuildingBlocks.Infrastructure.HealthChecks;
 using BuildingBlocks.Infrastructure.RateLimiting;
 using BuildingBlocks.Infrastructure.Tracing;
@@ -149,7 +156,12 @@ builder.Services.AddIdentityApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
 
 // ================================================================
-// Step 9: Discover controllers in module Presentation projects
+// Step 9: Register encryption services (needed by EF Core converters)
+// ================================================================
+builder.Services.AddVerixoraEncryption(builder.Configuration);
+
+// ================================================================
+// Step 10: Discover controllers in module Presentation projects
 // ================================================================
 // Without AddApplicationPart, the host would only scan its own
 // assembly for controllers.  We explicitly tell it to look in
@@ -158,12 +170,12 @@ builder.Services.AddControllers()
     .AddApplicationPart(typeof(Identity.Presentation.Controllers.AuthController).Assembly);
 
 // ================================================================
-// Step 10: Build the application
+// Step 11: Build the application
 // ================================================================
 var app = builder.Build();
 
 // ================================================================
-// Step 11: Configure the HTTP request pipeline (middleware)
+// Step 12: Configure the HTTP request pipeline (middleware)
 // ================================================================
 
 // --- Development‑only tools ---
@@ -185,10 +197,16 @@ app.UseRateLimiter();
 // Map the /health endpoint for infrastructure probes.
 app.MapHealthChecks("/health");
 
+// Initialise the static encryption service for EF Core value converters.
+// The service itself is registered above; here we grab the singleton
+// and store it in a static field so the parameterless converter can use it.
+BuildingBlocks.Infrastructure.Encryption.EncryptionConverter.EncryptionService =
+    app.Services.GetRequiredService<IEncryptionService>();
+
 // Map controller routes (e.g., /api/v1/auth/register).
 app.MapControllers();
 
 // ================================================================
-// Step 12: Start the server
+// Step 13: Start the server
 // ================================================================
 app.Run();

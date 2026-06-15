@@ -47,7 +47,7 @@ public static class DependencyInjection
         //    MediatR resolves IPipelineBehavior<,> for each request.
         services.AddTransient(
             typeof(IPipelineBehavior<,>),
-            typeof(CommandValidationBehaviour<>));
+            typeof(CommandValidationBehaviour<,>));
 
         services.AddTransient(
             typeof(IPipelineBehavior<,>),

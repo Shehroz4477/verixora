@@ -66,6 +66,8 @@ namespace BuildingBlocks.Infrastructure.Encryption;
 
 public class EncryptionOptions
 {
+    public const string SectionName = "Encryption";
+
     // ----------------------------------------------------------------
     // Multi‑key rotation (recommended)
     // ----------------------------------------------------------------
@@ -74,14 +76,15 @@ public class EncryptionOptions
     /// The key ID (GUID) to use for new encryptions.
     /// After validation this is a normalised 32‑character lowercase hex string.
     /// </summary>
-    public string? CurrentKeyId { get; private set; }
+    public string? CurrentKeyId { get; set; }
 
     /// <summary>
     /// All known encryption keys, indexed by normalised key ID.
     /// After validation this is an immutable read‑only dictionary.
     /// </summary>
-    public IReadOnlyDictionary<string, string> Keys { get; private set; } =
-        new ReadOnlyDictionary<string, string>(new Dictionary<string, string>());
+    //public IReadOnlyDictionary<string, string> Keys { get; private set; } =
+    //    new ReadOnlyDictionary<string, string>(new Dictionary<string, string>());
+    public Dictionary<string, string> Keys { get; set; } = new();
 
     // ----------------------------------------------------------------
     // Single‑key legacy (deprecated)
@@ -170,7 +173,7 @@ public class EncryptionOptions
                 $"EncryptionOptions: CurrentKeyId '{CurrentKeyId}' not found in the Keys dictionary.");
 
         // Replace the mutable dictionary with an immutable one.
-        Keys = new ReadOnlyDictionary<string, string>(normalisedKeys);
+        Keys = new Dictionary<string, string>(normalisedKeys);
     }
 
     // ----------------------------------------------------------------

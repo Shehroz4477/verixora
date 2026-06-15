@@ -29,7 +29,7 @@ namespace SharedKernel.Domain.Results;
 /// Represents the outcome of a void operation.
 /// </summary>
 [DebuggerDisplay("{ToString()}")]
-public readonly struct Result : IEquatable<Result>
+public readonly struct Result : IEquatable<Result>, IResult
 {
     public bool IsSuccess { get; }
     public bool IsFailure => !IsSuccess;
@@ -80,7 +80,7 @@ public readonly struct Result : IEquatable<Result>
 /// </summary>
 /// <typeparam name="T">The type of the success value.</typeparam>
 [DebuggerDisplay("{ToString()}")]
-public readonly struct Result<T> : IEquatable<Result<T>>
+public readonly struct Result<T> : IEquatable<Result<T>>, IResult
 {
     private readonly T? _value;
 

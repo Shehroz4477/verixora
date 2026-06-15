@@ -85,6 +85,10 @@ public static class DependencyInjection
                 npgsqlOptions => npgsqlOptions
                     .EnableRetryOnFailure(3, TimeSpan.FromSeconds(30), null)));
 
+        // Register the DbContext as the unit‑of‑work.
+        // Since IdentityDbContext now implements IUnitOfWork, we can just forward the same scoped instance.
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<IdentityDbContext>());
+
         // ------------------------------------------------------------
         // Repositories (Scoped – same lifetime as DbContext)
         // ------------------------------------------------------------

@@ -76,7 +76,7 @@ namespace Identity.Infrastructure.Persistence;
 /// <summary>
 /// EF Core database context for the Identity module.
 /// </summary>
-public sealed class IdentityDbContext : BaseDbContext
+public sealed class IdentityDbContext : BaseDbContext, IUnitOfWork
 {
     /// <summary>
     /// The Users table – stores registered users and their child

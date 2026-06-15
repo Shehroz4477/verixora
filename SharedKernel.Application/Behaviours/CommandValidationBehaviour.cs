@@ -21,7 +21,7 @@ using SharedKernel.Domain.Results;
 
 namespace SharedKernel.Application.Behaviours;
 
-public class CommandValidationBehaviour<TCommand>
+public class CommandValidationBehaviour<TCommand, TResult>
     : IPipelineBehavior<TCommand, Result>
     where TCommand : ICommand
 {

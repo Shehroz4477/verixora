@@ -64,7 +64,7 @@
 using BuildingBlocks.Infrastructure.Encryption;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
-namespace Identity.Infrastructure.Encryption;
+namespace BuildingBlocks.Infrastructure.Encryption;
 
 /// <summary>
 /// EF Core value converter that encrypts/decrypts string properties
@@ -72,6 +72,16 @@ namespace Identity.Infrastructure.Encryption;
 /// </summary>
 public sealed class EncryptionConverter : ValueConverter<string, string>
 {
+
+    // ----------------------------------------------------------------
+    // Static service reference – must be set at application startup.
+    // ----------------------------------------------------------------
+    /// <summary>
+    /// Set this at startup (e.g., in Program.cs) to the resolved
+    /// <see cref="IEncryptionService"/> from the DI container.
+    /// </summary>
+    public static IEncryptionService? EncryptionService { get; set; }
+
     /// <summary>
     /// Creates the converter with a reference to the service provider.
     /// EF Core calls this constructor automatically when the converter

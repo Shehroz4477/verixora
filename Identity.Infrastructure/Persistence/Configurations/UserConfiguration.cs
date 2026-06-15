@@ -92,7 +92,7 @@
 // ====================================================================
 
 using Identity.Domain.Entities;
-using Identity.Infrastructure.Encryption;
+using BuildingBlocks.Infrastructure.Encryption;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
