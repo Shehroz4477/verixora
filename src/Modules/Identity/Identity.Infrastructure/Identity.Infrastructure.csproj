@@ -45,10 +45,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
+      <ProjectReference Include="..\..\..\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
+      <ProjectReference Include="..\..\..\SharedKernel\SharedKernel.Application\SharedKernel.Application.csproj" />
       <ProjectReference Include="..\Identity.Application\Identity.Application.csproj" />
       <ProjectReference Include="..\Identity.Domain\Identity.Domain.csproj" />
-      <ProjectReference Include="..\SharedKernel.Domain\SharedKernel.Domain.csproj" />
     </ItemGroup>
 
 </Project>

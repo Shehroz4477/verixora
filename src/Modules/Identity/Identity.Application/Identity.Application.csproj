@@ -34,8 +34,8 @@
     </ItemGroup>
     
     <ItemGroup>
+      <ProjectReference Include="..\..\..\SharedKernel\SharedKernel.Application\SharedKernel.Application.csproj" />
       <ProjectReference Include="..\Identity.Domain\Identity.Domain.csproj" />
-      <ProjectReference Include="..\SharedKernel.Application\SharedKernel.Application.csproj" />
     </ItemGroup>
 
 </Project>

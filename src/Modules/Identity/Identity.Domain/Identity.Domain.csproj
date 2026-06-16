@@ -27,7 +27,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\SharedKernel.Domain\SharedKernel.Domain.csproj" />
+      <ProjectReference Include="..\..\..\SharedKernel\SharedKernel.Domain\SharedKernel.Domain.csproj" />
     </ItemGroup>
 
     <!-- Only dependency is the SharedKernel domain primitives -->

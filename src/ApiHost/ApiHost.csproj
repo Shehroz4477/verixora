@@ -25,7 +25,7 @@
        ================================================================ -->
     <ItemGroup>
         <ProjectReference Include="..\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
-        <ProjectReference Include="..\Identity.Presentation\Identity.Presentation.csproj" />
+        <ProjectReference Include="..\Modules\Identity\Identity.Presentation\Identity.Presentation.csproj" />
     </ItemGroup>
 
     <!-- ================================================================
