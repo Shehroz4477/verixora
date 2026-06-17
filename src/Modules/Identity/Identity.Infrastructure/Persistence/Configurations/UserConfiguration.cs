@@ -136,7 +136,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         // DbUpdateConcurrencyException if it has changed.
         builder.Property(x => x.RowVersion)
             .IsRowVersion()
-            .HasColumnName("RowVersion");
+            .HasColumnName("RowVersion")
+            .ValueGeneratedOnAddOrUpdate();
 
         // ------------------------------------------------------------
         // Email – encrypted at column level (ADR‑017)
