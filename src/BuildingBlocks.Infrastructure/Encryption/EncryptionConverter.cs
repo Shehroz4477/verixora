@@ -1,24 +1,23 @@
 // ====================================================================
-// VERIXORA – Identity.Infrastructure / Encryption / EncryptionConverter.cs
+// VERIXORA – BuildingBlocks.Infrastructure / Encryption / EncryptionConverter.cs
 // ====================================================================
 //
 // ARCHITECTURAL ROLE:
 //   An EF Core value converter that transparently encrypts/decrypts
 //   string properties at the column level.  It uses the application's
-//   registered <see cref="IEncryptionService"/> (from BuildingBlocks)
-//   to encrypt data before writing to the database and decrypt it
-//   after reading.
+//   registered <see cref="IEncryptionService"/> (which must be
+//   assigned to the static <see cref="EncryptionService"/> property
+//   at application startup).
 //
-//   WHY A VALUE CONVERTER:
-//     - EF Core value converters run automatically on every read/write
-//       for the configured property – no manual encryption calls
-//       needed in repositories or domain entities.
-//     - Keeps encryption logic out of business logic and persistence
-//       code.  Simply add `.HasConversion<EncryptionConverter>()` in
-//       the entity configuration.
-//     - The converter receives the application's IServiceProvider
-//       automatically via EF Core's dependency injection, so it can
-//       resolve <see cref="IEncryptionService"/> lazily.
+//   WHY A PARAMETERLESS CONSTRUCTOR:
+//     The original design relied on EF Core injecting an
+//     IServiceProvider into the converter's constructor.  That works
+//     at runtime but fails during `dotnet ef migrations add` because
+//     there is no DI container available at design time.
+//     The solution is a parameterless constructor combined with a
+//     static property that holds the encryption service.  The static
+//     property is set once in Program.cs after the DI container is
+//     built, and the converter uses it for all encryption/decryption.
 //
 //   HOW IT WORKS:
 //     1. On SAVE: EF Core calls the "convert to provider" lambda,
@@ -44,35 +43,33 @@
 //      TO the provider (encrypt) and one for converting FROM the
 //      provider (decrypt).
 //
-// 2. **IServiceProvider**:
-//    - The .NET dependency injection container.  EF Core
-//      automatically passes the application's service provider
-//      when creating value converters that have a constructor
-//      accepting <see cref="IServiceProvider"/>.
-//    - The converter stores the service provider and uses it to
-//      lazily resolve <see cref="IEncryptionService"/>.
+// 2. **Static property** (`EncryptionService`):
+//    - A single, application‑wide reference to the encryption
+//      service.  Set at startup from the DI container.
+//    - Avoids the need for constructor injection, which EF Core
+//      cannot provide during design‑time operations.
 //
-// 3. **Expression trees** (lambdas):
-//    - EF Core uses expression trees to compile the conversion
-//      logic into efficient delegates at model build time.
+// 3. **Parameterless constructor**:
+//    - Required by EF Core when the converter is used in
+//      `HasConversion<EncryptionConverter>()`.
+//    - Calls the base constructor with lambdas that reference the
+//      static `EncryptionService` property.
 //
 // 4. **sealed** modifier:
 //    - Prevents inheritance.  Encryption logic should not be
 //      overridden.
 // ====================================================================
 
-using BuildingBlocks.Infrastructure.Encryption;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace BuildingBlocks.Infrastructure.Encryption;
 
 /// <summary>
 /// EF Core value converter that encrypts/decrypts string properties
-/// using the application's <see cref="IEncryptionService"/>.
+/// using the application's registered <see cref="IEncryptionService"/>.
 /// </summary>
 public sealed class EncryptionConverter : ValueConverter<string, string>
 {
-
     // ----------------------------------------------------------------
     // Static service reference – must be set at application startup.
     // ----------------------------------------------------------------
@@ -82,21 +79,20 @@ public sealed class EncryptionConverter : ValueConverter<string, string>
     /// </summary>
     public static IEncryptionService? EncryptionService { get; set; }
 
+    // ----------------------------------------------------------------
+    // Parameterless constructor (required by EF Core)
+    // ----------------------------------------------------------------
     /// <summary>
-    /// Creates the converter with a reference to the service provider.
-    /// EF Core calls this constructor automatically when the converter
-    /// is registered via <c>.HasConversion&lt;EncryptionConverter&gt;()</c>.
+    /// Creates the converter.  EF Core calls this constructor
+    /// automatically when the converter is registered via
+    /// <c>.HasConversion&lt;EncryptionConverter&gt;()</c>.
     /// </summary>
-    /// <param name="serviceProvider">
-    /// The application's DI container, used to resolve
-    /// <see cref="IEncryptionService"/>.
-    /// </param>
-    public EncryptionConverter(IServiceProvider serviceProvider)
+    public EncryptionConverter()
         : base(
             // ---- Convert TO provider (encrypt for storage) ----
-            plainText => Encrypt(serviceProvider, plainText),
+            plainText => Encrypt(plainText),
             // ---- Convert FROM provider (decrypt for reading) ----
-            cipherText => Decrypt(serviceProvider, cipherText))
+            cipherText => Decrypt(cipherText))
     {
     }
 
@@ -105,21 +101,17 @@ public sealed class EncryptionConverter : ValueConverter<string, string>
     // ----------------------------------------------------------------
 
     /// <summary>
-    /// Encrypts a plaintext string using the resolved encryption service.
-    /// Returns the original value unchanged if it is null or empty.
+    /// Encrypts a plaintext string using the static encryption service.
+    /// Returns the original value unchanged if it is null or empty,
+    /// or if the static service has not been initialised.
     /// </summary>
-    private static string Encrypt(IServiceProvider sp, string plainText)
+    private static string Encrypt(string plainText)
     {
         // If the value is null or empty, pass it through unchanged.
         // This prevents encrypting empty strings, which could cause
         // unnecessary overhead and ciphertext bloat.
-        if (string.IsNullOrEmpty(plainText))
+        if (string.IsNullOrEmpty(plainText) || EncryptionService is null)
             return plainText;
-
-        // Lazily resolve the encryption service from DI.
-        // EF Core caches the converter instance, so this lookup
-        // happens only once per property, not per row.
-        var encryptionService = sp.GetRequiredService<IEncryptionService>();
 
         // Use a fixed context for all column‑level encryption.
         var context = new EncryptionContext(
@@ -127,73 +119,75 @@ public sealed class EncryptionConverter : ValueConverter<string, string>
             "ColumnEncryption",      // EntityType – identifies this usage
             "EFCore");               // Purpose – distinguishes from other encryption
 
-        return encryptionService.Encrypt(plainText, context);
+        return EncryptionService.Encrypt(plainText, context);
     }
 
     /// <summary>
     /// Decrypts a ciphertext string back to the original plaintext.
-    /// Returns the original value unchanged if it is null or empty.
+    /// Returns the original value unchanged if it is null or empty,
+    /// or if the static service has not been initialised.
     /// </summary>
-    private static string Decrypt(IServiceProvider sp, string cipherText)
+    private static string Decrypt(string cipherText)
     {
-        if (string.IsNullOrEmpty(cipherText))
+        if (string.IsNullOrEmpty(cipherText) || EncryptionService is null)
             return cipherText;
 
-        var encryptionService = sp.GetRequiredService<IEncryptionService>();
         var context = new EncryptionContext("SYSTEM", "ColumnEncryption", "EFCore");
 
-        return encryptionService.Decrypt(cipherText, context);
+        return EncryptionService.Decrypt(cipherText, context);
     }
 }
 
-
-
-//Dry‑run — how the converter is used and what happens at runtime:
+// Dry‑run — how the converter is used and what happens at runtime:
 // ====================================================================
-// 1. REGISTRATION (in UserConfiguration.cs):
-// ====================================================================
-// builder.Property(x => x.Email)
-//     .HasConversion<EncryptionConverter>();
+// 1. STARTUP (in Program.cs):
+//    BuildingBlocks.Infrastructure.Encryption.EncryptionConverter.EncryptionService
+//        = app.Services.GetRequiredService<IEncryptionService>();
 //
-// EF Core sees that EncryptionConverter has a constructor accepting
-// IServiceProvider.  At model build time, EF Core resolves the
-// converter from DI and caches it.
-
-// ====================================================================
-// 2. SAVE (INSERT or UPDATE):
-// ====================================================================
-// The handler calls:
-//   user = User.Register("alice@example.com", hash, now);
-//   repo.AddAsync(user);
-//   await uow.SaveChangesAsync();
+//    The static EncryptionService field is now set to the AES‑256‑GCM
+//    implementation registered in DI.
 //
-// EF Core processes the User entity.  For the Email property,
-// it calls the converter's "convert to provider" lambda:
-//   input:  "alice@example.com"
-//   output: "AQphM2YxYjJjNGQ1Z..." (Base64‑encoded AES‑GCM ciphertext)
-//
-// SQL generated:
-//   INSERT INTO identity."Users" ("Email", ...)
-//   VALUES ('AQphM2YxYjJjNGQ1Z...', ...);
-
 // ====================================================================
-// 3. READ (SELECT):
-// ====================================================================
-// The handler calls:
-//   var user = await repo.GetByIdAsync(id, ct);
+// 2. REGISTRATION (in UserConfiguration.cs):
+//    builder.Property(x => x.Email)
+//        .HasConversion<EncryptionConverter>();
 //
-// EF Core reads the row.  For the Email column, it calls the
-// converter's "convert from provider" lambda:
-//   input:  "AQphM2YxYjJjNGQ1Z..."
-//   output: "alice@example.com"
+//    EF Core sees that EncryptionConverter has a parameterless
+//    constructor.  It creates an instance and caches it for all
+//    Email conversions.
 //
-// The handler sees the decrypted email without any manual decryption.
-
 // ====================================================================
-// 4. NULL / EMPTY VALUES:
-// ====================================================================
-// If the Email property is null or empty:
-//   input:  "" or null
-//   output: "" or null (passed through unchanged)
+// 3. SAVE (INSERT or UPDATE):
+//    The handler calls:
+//      user = User.Register("alice@example.com", hash, now);
+//      repo.AddAsync(user);
+//      await uow.SaveChangesAsync();
 //
-// No encryption/decryption overhead for empty values.
+//    EF Core processes the User entity.  For the Email property,
+//    it calls the converter's "convert to provider" lambda:
+//      input:  "alice@example.com"
+//      output: "AQphM2YxYjJjNGQ1Z..." (Base64‑encoded AES‑GCM ciphertext)
+//
+//    SQL generated:
+//      INSERT INTO identity."Users" ("Email", ...)
+//      VALUES ('AQphM2YxYjJjNGQ1Z...', ...);
+//
+// ====================================================================
+// 4. READ (SELECT):
+//    The handler calls:
+//      var user = await repo.GetByIdAsync(id, ct);
+//
+//    EF Core reads the row.  For the Email column, it calls the
+//    converter's "convert from provider" lambda:
+//      input:  "AQphM2YxYjJjNGQ1Z..."
+//      output: "alice@example.com"
+//
+//    The handler sees the decrypted email without any manual decryption.
+//
+// ====================================================================
+// 5. NULL / EMPTY VALUES:
+//    If the Email property is null or empty:
+//      input:  "" or null
+//      output: "" or null (passed through unchanged)
+//
+//    No encryption/decryption overhead for empty values.

@@ -46,6 +46,12 @@
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
         <PackageReference Include="OpenTelemetry.Exporter.Console" />
+
+        <!-- EF Core Design – required for `dotnet ef` commands to run
+         against this startup project.  Without this package, the
+         EF Core CLI tools cannot discover the DbContext or
+         generate migrations. -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
     </ItemGroup>
 
 </Project>
